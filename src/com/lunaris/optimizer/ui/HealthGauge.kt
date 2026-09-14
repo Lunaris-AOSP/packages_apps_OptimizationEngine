@@ -47,7 +47,7 @@ fun HealthGauge(progress: Float?, label: String, modifier: Modifier = Modifier) 
                 Icon(Icons.Default.Build, contentDescription = null,
                     modifier = Modifier.size(48.dp), tint = primary)
             } else {
-                Text("${(value * 100).toInt()}%", style = MaterialTheme.typography.displayMedium)
+                Text("${(value * 100).toInt()}%", style = MaterialTheme.typography.headlineLarge)
             }
             Text(label, style = MaterialTheme.typography.labelLarge,
                 textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
