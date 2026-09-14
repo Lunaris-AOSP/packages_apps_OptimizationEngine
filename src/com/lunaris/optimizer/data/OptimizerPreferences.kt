@@ -15,6 +15,7 @@ class OptimizerPreferences(context: Context) {
         return Plan(
             selected = selected ?: Plan().selected,
             profile = Profile.entries.find { it.name == store.getString("profile", "QUICK") } ?: Profile.QUICK,
+            adaptiveCompilation = store.getBoolean("adaptive", false),
             fullCompilation = store.getBoolean("full", false),
             cacheTargetGiB = store.getInt("target", 4).coerceIn(1, 16),
             continueOnError = store.getBoolean("continue", true),
@@ -22,9 +23,10 @@ class OptimizerPreferences(context: Context) {
     }
     fun write(plan: Plan) {
         store.edit().putStringSet("actions", plan.selected.map { it.key }.toSet())
+            .putBoolean("adaptive", plan.adaptiveCompilation)
             .putString("profile", plan.profile.name).putBoolean("full", plan.fullCompilation)
             .putInt("target", plan.cacheTargetGiB).putBoolean("continue", plan.continueOnError).apply()
     }
     fun lastReport(): String = store.getString("last_report", "") ?: ""
-    fun saveReport(report: String) { store.edit().putString("last_report", report.take(16000)).apply() }
+    fun saveReport(report: String) { store.edit().putString("last_report", report.take(200000)).apply() }
 }

@@ -72,7 +72,9 @@ class OptimizerViewModel(application: Application) : AndroidViewModel(applicatio
             }
             if (run.id != 0L && !run.active && savedRun != run.id) {
                 val report = java.text.DateFormat.getDateTimeInstance().format(java.util.Date()) + "\n" +
-                    run.status + "\n" + run.results.joinToString("\n") { "${it.action.key}: ${it.status} — ${it.detail}" }
+                    run.status + "\n" + run.results.joinToString("\n") { "${it.action.key}: ${it.status} — ${it.detail}" } + "\n" +
+                    run.packages.joinToString("\n") { "${it.packageName}: ${it.filter} — ${it.status}" } +
+                    if (run.packagesTruncated) "\nPackage list limited to the first 300 apps." else ""
                 withContext(Dispatchers.IO) { preferences.saveReport(report) }
                 savedRun = run.id
                 state.update { it.copy(lastReport = report) }

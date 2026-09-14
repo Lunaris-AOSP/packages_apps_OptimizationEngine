@@ -168,6 +168,19 @@ fun OptimizerScreen(viewModel: OptimizerViewModel, onBack: () -> Unit) {
                         if (state.run.active) Text(stringResource(R.string.cancel_detail), style = MaterialTheme.typography.bodySmall)
                     }
                     items(state.run.results, key = { "result_" + it.action.key }) { result -> ResultCard(result) }
+                    if (state.run.packages.isNotEmpty()) item {
+                        SectionHeading(stringResource(R.string.package_filters))
+                        Text(stringResource(R.string.package_filters_detail), style = MaterialTheme.typography.bodySmall)
+                        if (state.run.packagesTruncated) Text(stringResource(R.string.package_limit))
+                    }
+                    items(state.run.packages, key = { "package_" + it.packageName }) { result ->
+                        Card(Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(result.packageName, style = MaterialTheme.typography.titleSmall)
+                                Text(result.filter + " · " + stringResource(statusLabel(result.status)))
+                            }
+                        }
+                    }
                 }
                 if (state.lastReport.isNotBlank()) item {
                     TextButton(onClick = { history = !history }) { Text(stringResource(R.string.last_report)) }
@@ -184,7 +197,8 @@ fun OptimizerScreen(viewModel: OptimizerViewModel, onBack: () -> Unit) {
         text = { Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             state.plan.selected.forEach { Text("• " + stringResource(actionTitle(it))) }
             if (Action.CACHE in state.plan.selected) Text(stringResource(R.string.cache_target, state.plan.cacheTargetGiB))
-            if (Action.DEXOPT in state.plan.selected && state.plan.fullCompilation) Text(stringResource(R.string.deep_warning))
+            if (Action.DEXOPT in state.plan.selected && (state.plan.fullCompilation || state.plan.adaptiveCompilation)) Text(stringResource(R.string.deep_warning))
+            if (Action.DEXOPT in state.plan.selected && state.plan.adaptiveCompilation) Text(stringResource(R.string.adaptive_detail))
             Text(stringResource(R.string.confirm_detail))
         } },
         confirmButton = { TextButton(onClick = viewModel::start) { Text(stringResource(R.string.start)) } },
@@ -255,10 +269,16 @@ private fun ActionCard(action: Action, plan: Plan, enabled: Boolean, toggle: (Bo
                     }, enabled = enabled && action in plan.selected, valueRange = 1f..16f, steps = 14)
                     Text(stringResource(R.string.cache_help), style = MaterialTheme.typography.bodySmall)
                 }
-                if (expanded && action == Action.DEXOPT) ToggleRow(stringResource(R.string.full_compile),
-                    stringResource(R.string.deep_warning), plan.fullCompilation, enabled && action in plan.selected) { full ->
+                if (expanded && action == Action.DEXOPT) {
+                    ToggleRow(stringResource(R.string.adaptive_compile), stringResource(R.string.adaptive_detail),
+                        plan.adaptiveCompilation, enabled && selected) { adaptive ->
+                        edit { it.copy(adaptiveCompilation = adaptive, fullCompilation = false, profile = Profile.CUSTOM) }
+                    }
+                    ToggleRow(stringResource(R.string.full_compile),
+                    stringResource(R.string.deep_warning), plan.fullCompilation, enabled && selected && !plan.adaptiveCompilation) { full ->
                         edit { it.copy(fullCompilation = full, profile = Profile.CUSTOM) }
                     }
+                }
             }
         }
     }
@@ -313,6 +333,7 @@ private fun statusLabel(status: String) = when (status) {
     "cancelled" -> R.string.cancelled
     "completed" -> R.string.completed
     "partial" -> R.string.partial
+    "compiled" -> R.string.compiled
     "success" -> R.string.success
     "failed" -> R.string.failed
     "unavailable" -> R.string.unavailable

@@ -57,4 +57,10 @@
     <string name="skipped">Skipped</string>
     <string name="queued">Queued</string>
     <string name="ready">Ready</string>
+    <string name="adaptive_compile">Advanced usage-based dexopt</string>
+    <string name="adaptive_detail">Uses 14 days of owner usage: at least 1 hour of foreground use and opened within 7 days → speed; other recent use → speed-profile; older usage → verify. Unknown usage → speed-profile. Android 16 uses verify instead of quicken. Speed requires charging.</string>
+    <string name="package_filters">Dexopt by app</string>
+    <string name="package_filters_detail">Requested filter and ART result for this run. Skipped means ART kept existing code; the requested filter may not have been applied. Verify does not force a downgrade of existing compiled code.</string>
+    <string name="package_limit">Showing the first 300 apps. All eligible apps are still processed.</string>
+    <string name="compiled">Compiled</string>
 </resources>
