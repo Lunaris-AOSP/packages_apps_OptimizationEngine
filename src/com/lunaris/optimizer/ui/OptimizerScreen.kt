@@ -5,6 +5,7 @@
 
 package com.lunaris.optimizer.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.*
@@ -49,6 +50,11 @@ import com.lunaris.optimizer.model.*
 fun OptimizerScreen(viewModel: OptimizerViewModel, onBack: () -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var history by rememberSaveable { mutableStateOf(false) }
+    var showDexoptApps by rememberSaveable { mutableStateOf(false) }
+    if (showDexoptApps) {
+        DexoptAppsScreen(state.run) { showDexoptApps = false }
+        return
+    }
     Scaffold(
         topBar = { TopAppBar(
             title = {},
@@ -127,6 +133,23 @@ fun OptimizerScreen(viewModel: OptimizerViewModel, onBack: () -> Unit) {
                 }
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        SectionHeading(stringResource(R.string.recent_dexopt_apps))
+                        val recentApps = state.run.packages.asReversed()
+                            .filter { it.status == "compiled" }.take(4)
+                        if (recentApps.isEmpty()) {
+                            Text(stringResource(R.string.no_compiled_apps),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        } else {
+                            recentApps.forEach { DexoptAppCard(it) }
+                        }
+                        TextButton(onClick = { showDexoptApps = true }) {
+                            Text(stringResource(R.string.view_all_dexopt_apps))
+                        }
+                    }
+                }
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         SectionHeading(stringResource(R.string.profiles))
                         BoxWithConstraints {
                             val stacked = maxWidth < 340.dp || LocalDensity.current.fontScale > 1.3f
@@ -168,19 +191,6 @@ fun OptimizerScreen(viewModel: OptimizerViewModel, onBack: () -> Unit) {
                         if (state.run.active) Text(stringResource(R.string.cancel_detail), style = MaterialTheme.typography.bodySmall)
                     }
                     items(state.run.results, key = { "result_" + it.action.key }) { result -> ResultCard(result) }
-                    if (state.run.packages.isNotEmpty()) item {
-                        SectionHeading(stringResource(R.string.package_filters))
-                        Text(stringResource(R.string.package_filters_detail), style = MaterialTheme.typography.bodySmall)
-                        if (state.run.packagesTruncated) Text(stringResource(R.string.package_limit))
-                    }
-                    items(state.run.packages, key = { "package_" + it.packageName }) { result ->
-                        Card(Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(result.packageName, style = MaterialTheme.typography.titleSmall)
-                                Text(result.filter + " · " + stringResource(statusLabel(result.status)))
-                            }
-                        }
-                    }
                 }
                 if (state.lastReport.isNotBlank()) item {
                     TextButton(onClick = { history = !history }) { Text(stringResource(R.string.last_report)) }
@@ -204,6 +214,56 @@ fun OptimizerScreen(viewModel: OptimizerViewModel, onBack: () -> Unit) {
         confirmButton = { TextButton(onClick = viewModel::start) { Text(stringResource(R.string.start)) } },
         dismissButton = { TextButton(onClick = viewModel::dismissConfirmation) { Text(stringResource(R.string.go_back)) } },
     )
+}
+
+@Composable
+private fun DexoptAppCard(result: PackageResult) {
+    Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+        Row(Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(result.packageName, style = MaterialTheme.typography.titleSmall)
+                Text(stringResource(statusLabel(result.status)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text(result.filter, modifier = Modifier.widthIn(max = 120.dp),
+                style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.End,
+                color = MaterialTheme.colorScheme.primary)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DexoptAppsScreen(run: Run, onBack: () -> Unit) {
+    BackHandler(onBack = onBack)
+    Scaffold(topBar = {
+        TopAppBar(
+            title = { Text(stringResource(R.string.package_filters)) },
+            navigationIcon = {
+                FilledTonalIconButton(onClick = onBack, modifier = Modifier.padding(start = 12.dp)) {
+                    Icon(Icons.Default.ArrowBack, stringResource(R.string.back))
+                }
+            },
+        )
+    }) { padding ->
+        Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
+            LazyColumn(Modifier.widthIn(max = 600.dp).fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                item {
+                    Text(stringResource(R.string.package_filters_detail),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (run.packagesTruncated) item { Text(stringResource(R.string.package_limit)) }
+                if (run.packages.isEmpty()) item { Text(stringResource(R.string.no_dexopt_apps)) }
+                items(run.packages.asReversed(), key = { it.packageName }) { DexoptAppCard(it) }
+            }
+        }
+    }
 }
 
 @Composable
