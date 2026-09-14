@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<permissions>
+    <privapp-permissions package="com.lunaris.optimizer">
+        <permission name="android.permission.MANAGE_DEVICE_OPTIMIZATION" />
+    </privapp-permissions>
+</permissions>
