@@ -26,6 +26,9 @@ data class OptimizerUiState(
     val error: String? = null,
     val confirm: Boolean = false,
     val lastReport: String = "",
+    val tools: Map<Tool, ToolState> = Tool.entries.associateWith { ToolState(it) },
+    val selectedRareApps: Set<String> = emptySet(),
+    val restartPrompt: Boolean = false,
 ) {
     val editable get() = !run.active && !busy
 }
@@ -37,6 +40,8 @@ class OptimizerViewModel(application: Application) : AndroidViewModel(applicatio
     private var savedRun = 0L
     private var initialized = false
     private val preferenceLock = Mutex()
+    private val refreshLock = Mutex()
+    private var promptedDataRun = 0L
     // Poll only while the screen has lifecycle-aware subscribers. A snapshot reattaches after process death.
     val uiState = flow {
         if (!initialized) {
@@ -57,7 +62,7 @@ class OptimizerViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), OptimizerUiState())
 
-    private suspend fun refresh(includeMetrics: Boolean) {
+    private suspend fun refresh(includeMetrics: Boolean) = refreshLock.withLock {
         try {
             val run = repository.snapshot()
             state.update { it.copy(run = run, connected = true,
@@ -69,6 +74,28 @@ class OptimizerViewModel(application: Application) : AndroidViewModel(applicatio
                     state.update { it.copy(metrics = metrics) }
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) { state.update { it.copy(error = e.message ?: "Metrics unavailable") } }
+            }
+            Tool.entries.forEach { tool ->
+                try {
+                    val toolState = repository.toolSnapshot(tool, state.value.tools[tool])
+                    state.update { current ->
+                        current.copy(
+                            tools = current.tools + (tool to toolState),
+                            selectedRareApps = if (tool == Tool.RARE_APPS && !toolState.active)
+                                current.selectedRareApps.intersect(toolState.rows.filter { it.selectable }.map { it.id }.toSet())
+                                else current.selectedRareApps,
+                            restartPrompt = current.restartPrompt ||
+                                (tool == Tool.DATA_CACHE && toolState.status == "completed"
+                                    && toolState.id != 0L && toolState.id != promptedDataRun),
+                        )
+                    }
+                    if (tool == Tool.DATA_CACHE && toolState.status == "completed" && toolState.id != 0L) {
+                        promptedDataRun = toolState.id
+                    }
+                } catch (e: CancellationException) { throw e }
+                catch (e: Exception) {
+                    state.update { it.copy(error = "${tool.key}: ${e.message ?: "Unable to refresh tool results"}") }
+                }
             }
             if (run.id != 0L && !run.active && savedRun != run.id) {
                 val report = java.text.DateFormat.getDateTimeInstance().format(java.util.Date()) + "\n" +
@@ -92,13 +119,48 @@ class OptimizerViewModel(application: Application) : AndroidViewModel(applicatio
     }
     fun profile(profile: Profile) = edit {
         when (profile) {
-            Profile.QUICK -> Plan()
-            Profile.DEEP -> Plan(profile = Profile.DEEP, fullCompilation = true)
+            Profile.QUICK -> Plan(cachePackages = it.cachePackages)
+            Profile.DEEP -> Plan(profile = Profile.DEEP, fullCompilation = true, cachePackages = it.cachePackages)
             Profile.CUSTOM -> it.copy(profile = Profile.CUSTOM)
         }
     }
     fun toggle(action: Action, enabled: Boolean) = edit {
         it.copy(profile = Profile.CUSTOM, selected = if (enabled) it.selected + action else it.selected - action)
+    }
+    fun selectAppCache(packageName: String, selected: Boolean) = edit {
+        it.copy(
+            profile = Profile.CUSTOM,
+            cachePackages = if (selected) it.cachePackages + packageName else it.cachePackages - packageName,
+        )
+    }
+    fun selectRareApp(packageName: String, selected: Boolean) {
+        state.update { it.copy(selectedRareApps = if (selected)
+            it.selectedRareApps + packageName else it.selectedRareApps - packageName) }
+    }
+    fun startTool(tool: Tool, packages: Set<String> = emptySet()) {
+        if (!state.value.connected || state.value.busy || state.value.tools.getValue(tool).active) return
+        state.update { it.copy(busy = true, error = null) }
+        viewModelScope.launch {
+            try {
+                repository.startTool(tool, packages)
+                if (tool == Tool.RARE_APPS && packages.isNotEmpty()) {
+                    state.update { it.copy(selectedRareApps = emptySet()) }
+                }
+                refresh(false)
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { state.update { it.copy(error = e.message ?: "Unable to start tool") } }
+            finally { state.update { it.copy(busy = false) } }
+        }
+    }
+    fun dismissRestart() { state.update { it.copy(restartPrompt = false) } }
+    fun restartDevice() {
+        state.update { it.copy(busy = true, restartPrompt = false) }
+        viewModelScope.launch {
+            try { repository.restartDevice() }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { state.update { it.copy(error = e.message ?: "Unable to restart device") } }
+            finally { state.update { it.copy(busy = false) } }
+        }
     }
     fun requestStart() {
         if (!state.value.editable || !state.value.connected || state.value.plan.selected.isEmpty()) return

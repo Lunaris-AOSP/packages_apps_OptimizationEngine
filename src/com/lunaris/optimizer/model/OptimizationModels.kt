@@ -14,14 +14,60 @@ data class Plan(
     val profile: Profile = Profile.QUICK,
     val fullCompilation: Boolean = false,
     val adaptiveCompilation: Boolean = false,
-    val cacheTargetGiB: Int = 4,
+    val cachePackages: Set<String> = emptySet(),
     val continueOnError: Boolean = true,
 ) {
     fun toBundle() = Bundle().apply {
         Action.entries.forEach { putBoolean(it.key, it in selected) }
         putString("filter", if (adaptiveCompilation) "adaptive" else if (fullCompilation) "speed" else "speed-profile")
-        putInt("cache_target_gib", cacheTargetGiB)
+        putStringArray("cache_packages", cachePackages.sorted().toTypedArray())
         putBoolean("continue_on_error", continueOnError)
+    }
+}
+
+enum class Tool(val key: String) {
+    APP_CACHE("app_cache"), DATA_CACHE("data_cache"), RARE_APPS("rare_apps"), RESOURCES("resources")
+}
+
+data class ToolRow(
+    val id: String,
+    val title: String,
+    val detail: String,
+    val bytes: Long = 0,
+    val cpuPercent: Float = 0f,
+    val memoryMb: Int = 0,
+    val background: Boolean = false,
+    val selectable: Boolean = true,
+)
+
+data class ToolState(
+    val kind: Tool,
+    val id: Long = 0,
+    val status: String = "idle",
+    val detail: String = "",
+    val rows: List<ToolRow> = emptyList(),
+) {
+    val active get() = status == "running"
+
+    companion object {
+        fun fromBundle(kind: Tool, b: Bundle) = ToolState(
+            kind = kind,
+            id = b.getLong("id"),
+            status = b.getString("status", "idle"),
+            detail = b.getString("detail", ""),
+            rows = (b.getParcelableArrayList("rows", Bundle::class.java) ?: arrayListOf()).map { row ->
+                ToolRow(
+                    id = row.getString("id", ""),
+                    title = row.getString("title", row.getString("id", "")),
+                    detail = row.getString("detail", ""),
+                    bytes = row.getLong("bytes"),
+                    cpuPercent = row.getFloat("cpu_percent"),
+                    memoryMb = row.getInt("memory_mb"),
+                    background = row.getBoolean("background"),
+                    selectable = row.getBoolean("selectable", true),
+                )
+            },
+        )
     }
 }
 data class ActionResult(val action: Action, val status: String, val detail: String)
