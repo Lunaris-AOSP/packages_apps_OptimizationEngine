@@ -80,18 +80,18 @@ fun OptimizerScreen(viewModel: OptimizerViewModel, onBack: () -> Unit) {
         onDismissRequest = viewModel::dismissError,
         title = { Text(stringResource(R.string.attention)) },
         text = { Text(toolError) },
-        confirmButton = { TextButton(onClick = { viewModel.dismissError(); viewModel.refreshMetrics() }) {
+        confirmButton = { TextButton(onClick = hapticClick { viewModel.dismissError(); viewModel.refreshMetrics() }) {
             Text(stringResource(R.string.retry))
         } },
-        dismissButton = { TextButton(onClick = viewModel::dismissError) { Text(stringResource(R.string.dismiss)) } },
+        dismissButton = { TextButton(onClick = hapticClick(viewModel::dismissError)) { Text(stringResource(R.string.dismiss)) } },
     )
 
     if (state.restartPrompt) AlertDialog(
         onDismissRequest = viewModel::dismissRestart,
         title = { Text(stringResource(R.string.restart_title)) },
         text = { Text(stringResource(R.string.restart_detail)) },
-        confirmButton = { TextButton(onClick = viewModel::restartDevice) { Text(stringResource(R.string.restart_now)) } },
-        dismissButton = { TextButton(onClick = viewModel::dismissRestart) { Text(stringResource(R.string.restart_later)) } },
+        confirmButton = { TextButton(onClick = hapticClick(viewModel::restartDevice)) { Text(stringResource(R.string.restart_now)) } },
+        dismissButton = { TextButton(onClick = hapticClick(viewModel::dismissRestart)) { Text(stringResource(R.string.restart_later)) } },
     )
 }
 
@@ -105,10 +105,10 @@ private fun MainScreen(state: OptimizerUiState, viewModel: OptimizerViewModel, o
     Scaffold(
         topBar = { TopAppBar(
             title = {},
-            navigationIcon = { FilledTonalIconButton(onClick = onBack, modifier = Modifier.padding(start = 12.dp)) {
+            navigationIcon = { FilledTonalIconButton(onClick = hapticClick(onBack), modifier = Modifier.padding(start = 12.dp)) {
                 Icon(Icons.Default.ArrowBack, stringResource(R.string.back))
             } },
-            actions = { IconButton(onClick = viewModel::refreshMainScreen, enabled = !state.busy) {
+            actions = { IconButton(onClick = hapticClick(viewModel::refreshMainScreen), enabled = !state.busy) {
                 Icon(Icons.Default.Refresh, stringResource(R.string.refresh))
             } },
         ) },
@@ -127,7 +127,7 @@ private fun MainScreen(state: OptimizerUiState, viewModel: OptimizerViewModel, o
                 item { StatusPanel(state) }
                 item {
                     Button(
-                        onClick = {
+                        onClick = hapticClick {
                             when {
                                 state.run.active -> viewModel.cancel()
                                 state.showRunResult -> navigate(Screen.RESULTS)
@@ -214,7 +214,7 @@ private fun MainScreen(state: OptimizerUiState, viewModel: OptimizerViewModel, o
                 if (!cacheSelectionValid) item { Text(stringResource(R.string.select_cache_apps_first), color = MaterialTheme.colorScheme.error) }
                 item { RecentAppsCard(state.run.packages, state.run.packagesTruncated) { navigate(Screen.DEXOPT) } }
                 if (state.lastReport.isNotBlank()) item {
-                    FilledTonalButton(onClick = { history = !history }, shape = RoundedCornerShape(50)) {
+                    FilledTonalButton(onClick = hapticClick { history = !history }, shape = RoundedCornerShape(50)) {
                         Text(stringResource(R.string.last_report))
                     }
                     if (history) SelectionContainer { Text(state.lastReport, style = MaterialTheme.typography.bodySmall) }
@@ -233,8 +233,8 @@ private fun MainScreen(state: OptimizerUiState, viewModel: OptimizerViewModel, o
             if (Action.DEXOPT in state.plan.selected && (state.plan.fullCompilation || state.plan.adaptiveCompilation)) Text(stringResource(R.string.deep_warning))
             Text(stringResource(R.string.confirm_detail))
         } },
-        confirmButton = { TextButton(onClick = viewModel::start) { Text(stringResource(R.string.start)) } },
-        dismissButton = { TextButton(onClick = viewModel::dismissConfirmation) { Text(stringResource(R.string.go_back)) } },
+        confirmButton = { TextButton(onClick = hapticClick(viewModel::start)) { Text(stringResource(R.string.start)) } },
+        dismissButton = { TextButton(onClick = hapticClick(viewModel::dismissConfirmation)) { Text(stringResource(R.string.go_back)) } },
     )
 }
 
@@ -266,7 +266,7 @@ private fun ProfileOption(profile: Profile, current: Profile, enabled: Boolean,
         color = container, contentColor = (if (selected) MaterialTheme.colorScheme.onPrimaryContainer
             else MaterialTheme.colorScheme.onSurfaceVariant).copy(alpha = if (enabled) 1f else 0.38f)) {
         Column(Modifier.selectable(selected = selected, enabled = enabled, role = Role.RadioButton,
-            onClick = onClick).padding(horizontal = 16.dp, vertical = 20.dp),
+            onClick = hapticClick(onClick)).padding(horizontal = 16.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Icon(if (selected) Icons.Default.Check else if (profile == Profile.QUICK) Icons.Default.PlayArrow else Icons.Default.Build,
                 contentDescription = null, modifier = Modifier.size(28.dp))
@@ -285,7 +285,7 @@ private fun RecentAppsCard(packages: List<PackageResult>, truncated: Boolean, op
                 Text(stringResource(R.string.recent_dexopt_apps), style = MaterialTheme.typography.titleMedium)
                 Text(if (packages.isEmpty()) stringResource(R.string.no_dexopt_apps) else stringResource(R.string.recent_apps_count, packages.size, if (truncated) " +" else ""), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            TextButton(onClick = open) { Text(stringResource(R.string.view_all_dexopt_apps)) }
+            TextButton(onClick = hapticClick(open)) { Text(stringResource(R.string.view_all_dexopt_apps)) }
         }
     }
 }
@@ -338,8 +338,8 @@ private fun RareAppsScreen(state: OptimizerUiState, viewModel: OptimizerViewMode
     val tool = state.tools.getValue(Tool.RARE_APPS)
     ToolScaffold(stringResource(R.string.rare_apps_title), onBack, {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { viewModel.startTool(Tool.RARE_APPS) }, enabled = state.connected && !state.busy && !tool.active) { Text(stringResource(R.string.scan_apps)) }
-            Button(onClick = { viewModel.startTool(Tool.RARE_APPS, state.selectedRareApps) },
+            OutlinedButton(onClick = hapticClick { viewModel.startTool(Tool.RARE_APPS) }, enabled = state.connected && !state.busy && !tool.active) { Text(stringResource(R.string.scan_apps)) }
+            Button(onClick = hapticClick { viewModel.startTool(Tool.RARE_APPS, state.selectedRareApps) },
                 enabled = state.connected && !state.busy && !tool.active && state.selectedRareApps.isNotEmpty()) { Text(stringResource(R.string.stop_selected)) }
         }
     }) {
@@ -371,7 +371,7 @@ private fun ToolScaffold(title: String, onBack: () -> Unit, actions: @Composable
     BackHandler(onBack = onBack)
     Scaffold(
         topBar = { TopAppBar(title = { Text(title) }, navigationIcon = {
-            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, stringResource(R.string.back)) }
+            IconButton(onClick = hapticClick(onBack)) { Icon(Icons.Default.ArrowBack, stringResource(R.string.back)) }
         }) },
         bottomBar = bottomBar ?: { Surface { Box(Modifier.navigationBarsPadding().fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { actions() } } },
     ) { padding ->
@@ -387,7 +387,7 @@ private fun ToolScaffold(title: String, onBack: () -> Unit, actions: @Composable
 
 @Composable
 private fun ToolActionButton(tool: ToolState, label: String, enabled: Boolean, action: () -> Unit) {
-    Button(onClick = action, enabled = enabled && !tool.active, modifier = Modifier.fillMaxWidth().widthIn(max = 560.dp)) {
+    Button(onClick = hapticClick(action), enabled = enabled && !tool.active, modifier = Modifier.fillMaxWidth().widthIn(max = 560.dp)) {
         if (tool.active) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) else Icon(Icons.Default.PlayArrow, null)
         Spacer(Modifier.width(8.dp)); Text(if (tool.active) stringResource(R.string.running) else label)
     }
@@ -401,7 +401,7 @@ private fun SelectableToolRow(row: ToolRow, selected: Boolean, enabled: Boolean,
             value = selected,
             enabled = enabled,
             role = Role.Checkbox,
-            onValueChange = change,
+            onValueChange = hapticToggle(change),
         ).padding(16.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -430,7 +430,7 @@ private fun AppCacheMaintenanceCard(selected: Boolean, count: Int, enabled: Bool
     Card(Modifier.fillMaxWidth(), colors = maintenanceCardColors()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ToggleRow(stringResource(R.string.cache_title), stringResource(R.string.cache_detail), selected, enabled, toggle)
         Text(stringResource(R.string.cache_selected_count, count), style = MaterialTheme.typography.bodySmall)
-        OutlinedButton(onClick = configure, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
+        OutlinedButton(onClick = hapticClick(configure), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
             Icon(Icons.Default.Settings, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.choose_apps))
         }
     } }
@@ -438,7 +438,7 @@ private fun AppCacheMaintenanceCard(selected: Boolean, count: Int, enabled: Bool
 
 @Composable
 private fun ToolNavigationCard(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, detail: String, open: () -> Unit) {
-    Card(onClick = open, modifier = Modifier.fillMaxWidth()) { Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
+    Card(onClick = hapticClick(open), modifier = Modifier.fillMaxWidth()) { Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         Icon(icon, null)
         Column(Modifier.weight(1f)) { Text(title, style = MaterialTheme.typography.titleMedium); Text(detail, style = MaterialTheme.typography.bodySmall) }
@@ -454,7 +454,7 @@ private fun ActionCard(action: Action, plan: Plan, enabled: Boolean, toggle: (Bo
     Card(Modifier.fillMaxWidth(), colors = maintenanceCardColors()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ToggleRow(stringResource(actionTitle(action)), stringResource(actionDetail(action)), selected, enabled, toggle)
         if (action == Action.DEXOPT) {
-            OutlinedButton(onClick = { expanded = !expanded }, enabled = enabled && selected,
+            OutlinedButton(onClick = hapticClick { expanded = !expanded }, enabled = enabled && selected,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) { Text(stringResource(R.string.configure)) }
             if (expanded) {
                 ToggleRow(stringResource(R.string.adaptive_compile), stringResource(R.string.adaptive_detail),
@@ -478,7 +478,7 @@ private fun ToggleRow(title: String, detail: String, checked: Boolean, enabled: 
         value = checked,
         enabled = enabled,
         role = Role.Switch,
-        onValueChange = change,
+        onValueChange = hapticToggle(change),
     ),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.weight(1f)) { Text(title, style = MaterialTheme.typography.titleMedium); Text(detail, style = MaterialTheme.typography.bodySmall) }
@@ -497,7 +497,7 @@ private fun ToggleRow(title: String, detail: String, checked: Boolean, enabled: 
 
 @Composable private fun ErrorCard(message: String, retry: () -> Unit) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
-        Column(Modifier.padding(16.dp)) { Text(stringResource(R.string.attention)); Text(message); TextButton(onClick = retry) { Text(stringResource(R.string.retry)) } }
+        Column(Modifier.padding(16.dp)) { Text(stringResource(R.string.attention)); Text(message); TextButton(onClick = hapticClick(retry)) { Text(stringResource(R.string.retry)) } }
     }
 }
 

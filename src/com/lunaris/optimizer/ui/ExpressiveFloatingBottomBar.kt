@@ -96,7 +96,7 @@ private fun FloatingNavItem(
     Surface(modifier = modifier, shape = CircleShape, color = containerColor, contentColor = contentColor) {
         Row(
             modifier = Modifier.clip(CircleShape)
-                .selectable(selected = selected, role = Role.Tab, onClick = onClick)
+                .selectable(selected = selected, role = Role.Tab, onClick = hapticClick(onClick))
                 .fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
