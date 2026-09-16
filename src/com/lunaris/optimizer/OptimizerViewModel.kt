@@ -29,8 +29,10 @@ data class OptimizerUiState(
     val tools: Map<Tool, ToolState> = Tool.entries.associateWith { ToolState(it) },
     val selectedRareApps: Set<String> = emptySet(),
     val restartPrompt: Boolean = false,
+    val dismissedResultRunId: Long = 0,
 ) {
     val editable get() = !run.active && !busy
+    val showRunResult get() = run.id != 0L && !run.active && run.id != dismissedResultRunId
 }
 
 class OptimizerViewModel(application: Application) : AndroidViewModel(application) {
@@ -39,14 +41,17 @@ class OptimizerViewModel(application: Application) : AndroidViewModel(applicatio
     private val state = MutableStateFlow(OptimizerUiState())
     private var savedRun = 0L
     private var initialized = false
+    private var receivedInitialRun = false
     private val preferenceLock = Mutex()
     private val refreshLock = Mutex()
     private var promptedDataRun = 0L
+    private var clearedCacheRun = 0L
     // Poll only while the screen has lifecycle-aware subscribers. A snapshot reattaches after process death.
     val uiState = flow {
         if (!initialized) {
             val plan = withContext(Dispatchers.IO) { preferences.read() }
             val report = withContext(Dispatchers.IO) { preferences.lastReport() }
+            clearedCacheRun = withContext(Dispatchers.IO) { preferences.clearedCacheRun() }
             state.update { it.copy(plan = plan, lastReport = report) }
             initialized = true
         }
@@ -65,9 +70,18 @@ class OptimizerViewModel(application: Application) : AndroidViewModel(applicatio
     private suspend fun refresh(includeMetrics: Boolean) = refreshLock.withLock {
         try {
             val run = repository.snapshot()
+            val dismissInitialResult = !receivedInitialRun && !run.active
+            receivedInitialRun = true
             state.update { it.copy(run = run, connected = true,
+                dismissedResultRunId = if (dismissInitialResult) run.id else it.dismissedResultRunId,
                 elapsedSeconds = if (run.started == 0L) 0 else
                     ((if (run.active) SystemClock.elapsedRealtime() else run.finished) - run.started).coerceAtLeast(0) / 1000) }
+            if (run.id != 0L && run.id != clearedCacheRun && run.results.any {
+                    it.action == Action.CACHE && it.status in setOf("success", "partial", "failed", "cancelled")
+                }) {
+                clearedCacheRun = run.id
+                clearAppCacheSelection()
+            }
             if (includeMetrics) {
                 try {
                     val metrics = repository.metrics()
@@ -110,17 +124,36 @@ class OptimizerViewModel(application: Application) : AndroidViewModel(applicatio
         catch (e: Exception) { state.update { it.copy(connected = false, error = e.message ?: e.javaClass.simpleName) } }
     }
     fun refreshMetrics() = viewModelScope.launch { refresh(true) }
+    fun refreshMainScreen() {
+        state.update { if (it.run.active) it else it.copy(dismissedResultRunId = it.run.id) }
+        refreshMetrics()
+    }
     fun dismissError() { state.update { it.copy(error = null) } }
     fun edit(transform: (Plan) -> Plan) {
         if (!state.value.editable || !initialized) return
         val plan = transform(state.value.plan)
         state.update { it.copy(plan = plan) }
-        viewModelScope.launch { preferenceLock.withLock { withContext(Dispatchers.IO) { preferences.write(plan) } } }
+        persistPlan()
+    }
+    private fun persistPlan() {
+        viewModelScope.launch {
+            preferenceLock.withLock {
+                val plan = state.value.plan
+                val cacheRun = clearedCacheRun
+                withContext(Dispatchers.IO) { preferences.write(plan, cacheRun) }
+            }
+        }
+    }
+    private fun clearAppCacheSelection() {
+        state.update { it.copy(plan = it.plan.copy(
+            selected = it.plan.selected - Action.CACHE,
+            cachePackages = emptySet(),
+        )) }
+        persistPlan()
     }
     fun profile(profile: Profile) = edit {
         when (profile) {
-            Profile.QUICK -> Plan(cachePackages = it.cachePackages)
-            Profile.DEEP -> Plan(profile = Profile.DEEP, fullCompilation = true, cachePackages = it.cachePackages)
+            Profile.QUICK, Profile.DEEP -> Plan.forProfile(profile).copy(cachePackages = it.cachePackages)
             Profile.CUSTOM -> it.copy(profile = Profile.CUSTOM)
         }
     }
@@ -139,10 +172,12 @@ class OptimizerViewModel(application: Application) : AndroidViewModel(applicatio
     }
     fun startTool(tool: Tool, packages: Set<String> = emptySet()) {
         if (!state.value.connected || state.value.busy || state.value.tools.getValue(tool).active) return
+        if (tool == Tool.APP_CACHE && state.value.run.active) return
         state.update { it.copy(busy = true, error = null) }
         viewModelScope.launch {
             try {
                 repository.startTool(tool, packages)
+                if (tool == Tool.APP_CACHE) clearAppCacheSelection()
                 if (tool == Tool.RARE_APPS && packages.isNotEmpty()) {
                     state.update { it.copy(selectedRareApps = emptySet()) }
                 }

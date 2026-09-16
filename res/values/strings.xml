@@ -5,11 +5,13 @@
     <string name="refresh">Refresh system state</string>
     <string name="cancelling">Stopping…</string>
     <string name="cancel_run">Stop after current action</string>
-    <string name="review_plan">Review maintenance plan</string>
+    <string name="review_plan">Optimize</string>
+    <string name="optimize">Optimize</string>
+    <string name="run_result">Run result</string>
     <string name="connecting">Service unavailable</string>
     <string name="on_your_terms">On your terms</string>
     <string name="run_progress">Run progress</string>
-    <string name="intro">Choose what runs. Review every result. Android already maintains your device automatically; use these tools when you need them.</string>
+    <string name="intro">Choose a profile and optimize when you are ready.</string>
     <string name="attention">Action needed</string>
     <string name="retry">Retry connection</string>
     <string name="dismiss">Dismiss</string>
@@ -21,11 +23,16 @@
     <string name="profiles">Maintenance profile</string>
     <string name="quick">Quick Optimize</string>
     <string name="deep">Deep Optimize</string>
-    <string name="quick_detail">Profile-guided app compilation and Android storage maintenance. Duration depends on your apps and device.</string>
-    <string name="deep_detail">Full app compilation and storage maintenance. Uses more time, power, and disk space. A charger is required.</string>
+    <string name="quick_detail">Advanced usage-based dexopt and Android storage maintenance. Duration depends on your apps and device.</string>
+    <string name="deep_detail" formatted="false">Full app compilation, storage maintenance, and zRAM compaction. Uses more time, power, and disk space. Requires charging or battery above 25%.</string>
     <string name="actions">Individual optimizations</string>
     <string name="main_maintenance">Main Maintenance</string>
     <string name="other_tools">Other Optimization Tools</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_extra">Extra</string>
+    <string name="other_tools_detail">Maintenance utilities for cache, app activity, and system resources.</string>
+    <string name="run_result_detail">Actions completed in the latest optimization run.</string>
+    <string name="recent_apps_count">%1$d apps%2$s</string>
     <string name="continue_errors">Continue after an error</string>
     <string name="continue_detail">Let independent actions run if an earlier action fails.</string>
     <string name="results">Run results</string>
@@ -33,7 +40,7 @@
     <string name="cancel_detail">Cancellation stops upcoming work. A cache or storage request already accepted by Android may finish in the background.</string>
     <string name="last_report">Last completed report</string>
     <string name="scope_note">Owner user only. Personal files and app data are preserved. Free memory and compilation coverage are not device health scores.</string>
-    <string name="deep_warning">Full compilation requires charging and may take a long time. It can use additional storage; compilation stops if the device becomes too warm.</string>
+    <string name="deep_warning" formatted="false">Full compilation requires charging or battery above 25% and may take a long time. It can use additional storage; compilation stops before the next app if unplugged battery reaches 25% or the device becomes too warm.</string>
     <string name="confirm_detail">Only the selected actions will run. You can leave this screen and return to see progress.</string>
     <string name="start">Start maintenance</string>
     <string name="go_back">Go back</string>
@@ -59,7 +66,7 @@
     <string name="queued">Queued</string>
     <string name="ready">Ready</string>
     <string name="adaptive_compile">Advanced usage-based dexopt</string>
-    <string name="adaptive_detail">Uses 14 days of owner usage: at least 1 hour of foreground use and opened within 7 days → speed; other recent use → speed-profile; older usage → verify. Unknown usage → speed-profile. Android 16 uses verify instead of quicken. Speed requires charging.</string>
+    <string name="adaptive_detail" formatted="false">Uses 14 days of owner usage: at least 1 hour of foreground use and opened within 7 days → speed; other recent use → speed-profile; older usage → verify. Unknown usage → speed-profile. Android 16 uses verify instead of quicken. Speed requires charging or battery above 25%.</string>
     <string name="package_filters">Dexopt by app</string>
     <string name="recent_dexopt_apps">Recently optimized apps</string>
     <string name="view_all_dexopt_apps">View full dexopt app list</string>
@@ -83,7 +90,7 @@
     <string name="restart_later">Later</string>
     <string name="rare_apps_title">Rarely Used App Management</string>
     <string name="rare_apps_detail">Find rarely used third-party apps that are still active in the background.</string>
-    <string name="rare_apps_screen_detail">The scan lists stoppable apps with no foreground use in the last 30 days that currently have a background process.</string>
+    <string name="rare_apps_screen_detail">The scan lists stoppable apps with no foreground use in the last 24 hours that currently have a background process.</string>
     <string name="stop_selected">Stop selected</string>
     <string name="resources_title">System &amp; App Resource Analysis</string>
     <string name="resources_detail">Rank running system processes and apps by memory and sampled CPU use.</string>

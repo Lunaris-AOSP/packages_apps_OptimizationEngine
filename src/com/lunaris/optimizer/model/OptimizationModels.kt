@@ -13,10 +13,22 @@ data class Plan(
     val selected: Set<Action> = setOf(Action.TRIM, Action.DEXOPT),
     val profile: Profile = Profile.QUICK,
     val fullCompilation: Boolean = false,
-    val adaptiveCompilation: Boolean = false,
+    val adaptiveCompilation: Boolean = true,
     val cachePackages: Set<String> = emptySet(),
     val continueOnError: Boolean = true,
 ) {
+    companion object {
+        fun forProfile(profile: Profile) = when (profile) {
+            Profile.DEEP -> Plan(
+                selected = setOf(Action.TRIM, Action.ZRAM, Action.DEXOPT),
+                profile = Profile.DEEP,
+                fullCompilation = true,
+                adaptiveCompilation = false,
+            )
+            else -> Plan(profile = profile)
+        }
+    }
+
     fun toBundle() = Bundle().apply {
         Action.entries.forEach { putBoolean(it.key, it in selected) }
         putString("filter", if (adaptiveCompilation) "adaptive" else if (fullCompilation) "speed" else "speed-profile")

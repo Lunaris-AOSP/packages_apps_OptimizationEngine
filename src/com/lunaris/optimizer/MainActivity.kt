@@ -6,7 +6,9 @@
 package com.lunaris.optimizer
 
 import android.os.Bundle
+import android.content.Intent
 import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import com.lunaris.optimizer.ui.OptimizerScreen
@@ -18,10 +20,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        window.isNavigationBarContrastEnforced = false
         setContent {
             OptimizerTheme {
                 OptimizerScreen(viewModel = viewModel, onBack = { finish() })
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        viewModel.refreshMainScreen()
     }
 }

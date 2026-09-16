@@ -6,15 +6,21 @@
 package com.lunaris.optimizer.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -26,8 +32,11 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -39,16 +48,26 @@ import com.lunaris.optimizer.OptimizerViewModel
 import com.lunaris.optimizer.R
 import com.lunaris.optimizer.model.*
 
-private enum class Screen { MAIN, APP_CACHE, DATA_CACHE, RARE_APPS, RESOURCES, DEXOPT }
+private enum class Screen { MAIN, TOOLS, RESULTS, APP_CACHE, DATA_CACHE, RARE_APPS, RESOURCES, DEXOPT }
 
 @Composable
 fun OptimizerScreen(viewModel: OptimizerViewModel, onBack: () -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var screen by rememberSaveable { mutableStateOf(Screen.MAIN) }
     val navigateBack = { if (screen == Screen.MAIN) onBack() else screen = Screen.MAIN }
+    // Keep the spring alive while Main and Tools replace one another.
+    val selectedTab = if (screen == Screen.TOOLS) 1 else 0
+    val navigationSegments = rememberElasticSegments(2, selectedTab)
+    val bottomBar: @Composable () -> Unit = {
+        FloatingBottomNavigation(selectedTab, navigationSegments) {
+            screen = if (it == 0) Screen.MAIN else Screen.TOOLS
+        }
+    }
 
     when (screen) {
-        Screen.MAIN -> MainScreen(state, viewModel, onBack) { screen = it }
+        Screen.MAIN -> MainScreen(state, viewModel, onBack, bottomBar) { screen = it }
+        Screen.TOOLS -> ToolsScreen(navigateBack, bottomBar) { screen = it }
+        Screen.RESULTS -> ResultsScreen(state.run, navigateBack)
         Screen.APP_CACHE -> AppCacheScreen(state, viewModel, navigateBack)
         Screen.DATA_CACHE -> DataCacheScreen(state, viewModel, navigateBack)
         Screen.RARE_APPS -> RareAppsScreen(state, viewModel, navigateBack)
@@ -79,6 +98,7 @@ fun OptimizerScreen(viewModel: OptimizerViewModel, onBack: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MainScreen(state: OptimizerUiState, viewModel: OptimizerViewModel, onBack: () -> Unit,
+    bottomBar: @Composable () -> Unit,
     navigate: (Screen) -> Unit) {
     var history by rememberSaveable { mutableStateOf(false) }
     val cacheSelectionValid = Action.CACHE !in state.plan.selected || state.plan.cachePackages.isNotEmpty()
@@ -88,67 +108,90 @@ private fun MainScreen(state: OptimizerUiState, viewModel: OptimizerViewModel, o
             navigationIcon = { FilledTonalIconButton(onClick = onBack, modifier = Modifier.padding(start = 12.dp)) {
                 Icon(Icons.Default.ArrowBack, stringResource(R.string.back))
             } },
-            actions = { IconButton(onClick = viewModel::refreshMetrics, enabled = !state.busy) {
+            actions = { IconButton(onClick = viewModel::refreshMainScreen, enabled = !state.busy) {
                 Icon(Icons.Default.Refresh, stringResource(R.string.refresh))
             } },
         ) },
-        bottomBar = { Surface(color = MaterialTheme.colorScheme.background) {
-            Button(
-                onClick = { if (state.run.active) viewModel.cancel() else viewModel.requestStart() },
-                enabled = state.connected && !state.busy && state.run.status != "cancelling" &&
-                    (state.run.active || state.plan.selected.isNotEmpty() && cacheSelectionValid),
-                modifier = Modifier.navigationBarsPadding().padding(20.dp, 12.dp)
-                    .widthIn(max = 600.dp).fillMaxWidth().heightIn(min = 56.dp),
-            ) {
-                Icon(if (state.run.active) Icons.Default.Close else Icons.Default.PlayArrow, null)
-                Spacer(Modifier.width(10.dp))
-                Text(stringResource(when {
-                    state.run.status == "cancelling" -> R.string.cancelling
-                    state.run.active -> R.string.cancel_run
-                    else -> R.string.review_plan
-                }))
-            }
-        } },
+        bottomBar = bottomBar,
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
+        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+            .padding(top = padding.calculateTopPadding()), contentAlignment = Alignment.TopCenter) {
             LazyColumn(
                 Modifier.widthIn(max = 600.dp).fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp,
+                    bottom = padding.calculateBottomPadding() + 12.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 item { Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineLarge,
                     modifier = Modifier.padding(vertical = 8.dp).semantics { heading() }) }
                 item { StatusPanel(state) }
+                item {
+                    Button(
+                        onClick = {
+                            when {
+                                state.run.active -> viewModel.cancel()
+                                state.showRunResult -> navigate(Screen.RESULTS)
+                                else -> viewModel.requestStart()
+                            }
+                        },
+                        enabled = state.showRunResult || (state.connected && !state.busy &&
+                            state.run.status != "cancelling" &&
+                            (state.run.active || state.plan.selected.isNotEmpty() && cacheSelectionValid)),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                    ) {
+                        Icon(when {
+                            state.run.active -> Icons.Default.Close
+                            state.showRunResult -> Icons.Default.Check
+                            else -> Icons.Default.PlayArrow
+                        }, null)
+                        Spacer(Modifier.width(10.dp))
+                        Text(stringResource(when {
+                            state.run.status == "cancelling" -> R.string.cancelling
+                            state.run.active -> R.string.cancel_run
+                            state.showRunResult -> R.string.run_result
+                            else -> R.string.optimize
+                        }))
+                    }
+                }
                 state.error?.let { message -> item { ErrorCard(message) { viewModel.dismissError(); viewModel.refreshMetrics() } } }
                 item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Metric(stringResource(R.string.memory), state.metrics.ramAvailableMb?.let { stringResource(R.string.mb, it) } ?: "-", Modifier.weight(1f))
                     Metric(stringResource(R.string.storage), state.metrics.storageAvailable, Modifier.weight(1f))
                 } }
                 item {
-                    SectionHeading(stringResource(R.string.profiles))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = state.plan.profile == Profile.QUICK,
-                            onClick = { viewModel.profile(Profile.QUICK) },
-                            label = { Text(stringResource(R.string.quick)) },
-                            leadingIcon = if (state.plan.profile == Profile.QUICK) { { Icon(Icons.Default.Check, null) } } else null,
-                            enabled = state.editable,
-                            modifier = Modifier.weight(1f),
-                        )
-                        FilterChip(
-                            selected = state.plan.profile == Profile.DEEP,
-                            onClick = { viewModel.profile(Profile.DEEP) },
-                            label = { Text(stringResource(R.string.deep)) },
-                            leadingIcon = if (state.plan.profile == Profile.DEEP) { { Icon(Icons.Default.Check, null) } } else null,
-                            enabled = state.editable,
-                            modifier = Modifier.weight(1f),
-                        )
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        SectionHeading(stringResource(R.string.profiles))
+                        BoxWithConstraints {
+                            val stacked = maxWidth < 340.dp || LocalDensity.current.fontScale > 1.3f
+                            val profiles = listOf(Profile.QUICK, Profile.DEEP)
+                            val segments = rememberElasticSegments(profiles.size, profiles.indexOf(state.plan.profile), elasticity = 0.45f)
+                            if (stacked) {
+                                Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    profiles.forEachIndexed { index, profile ->
+                                        ProfileOption(profile, state.plan.profile, state.editable,
+                                            Modifier.fillMaxWidth().graphicsLayer {
+                                                scaleX = 0.96f + (segments.weights[index] - 0.70f) * 0.06f
+                                            }) { segments.tap(index); viewModel.profile(profile) }
+                                    }
+                                }
+                            } else {
+                                Row(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    profiles.forEachIndexed { index, profile ->
+                                        ProfileOption(profile, state.plan.profile, state.editable,
+                                            Modifier.weight(segments.weights[index])) {
+                                            segments.tap(index); viewModel.profile(profile)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Text(stringResource(when (state.plan.profile) {
+                            Profile.QUICK -> R.string.quick_detail
+                            Profile.DEEP -> R.string.deep_detail
+                            Profile.CUSTOM -> R.string.custom_detail
+                        }), style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Text(stringResource(when (state.plan.profile) {
-                        Profile.QUICK -> R.string.quick_detail
-                        Profile.DEEP -> R.string.deep_detail
-                        Profile.CUSTOM -> R.string.custom_detail
-                    }), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 item { SectionHeading(stringResource(R.string.main_maintenance)) }
                 item { AppCacheMaintenanceCard(
@@ -158,29 +201,22 @@ private fun MainScreen(state: OptimizerUiState, viewModel: OptimizerViewModel, o
                     toggle = { viewModel.toggle(Action.CACHE, it) },
                     configure = { navigate(Screen.APP_CACHE) },
                 ) }
-                items(listOf(Action.TRIM, Action.ZRAM, Action.DEXOPT), key = { it.key }) { action ->
+                // Keys must be unique across maintenance cards and results in this LazyColumn.
+                items(listOf(Action.TRIM, Action.ZRAM, Action.DEXOPT), key = { "maintenance:${it.key}" }) { action ->
                     ActionCard(action, state.plan, state.editable, { viewModel.toggle(action, it) }, viewModel::edit)
                 }
-                item { Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp)) {
+                item { Card(Modifier.fillMaxWidth(), colors = maintenanceCardColors()) {
                     Box(Modifier.padding(16.dp)) { ToggleRow(
                         stringResource(R.string.continue_errors), stringResource(R.string.continue_detail),
                         state.plan.continueOnError, state.editable,
                     ) { enabled -> viewModel.edit { it.copy(continueOnError = enabled) } } }
                 } }
                 if (!cacheSelectionValid) item { Text(stringResource(R.string.select_cache_apps_first), color = MaterialTheme.colorScheme.error) }
-                item { SectionHeading(stringResource(R.string.other_tools)) }
-                item { ToolNavigationCard(Icons.Default.Delete, stringResource(R.string.data_cache_title), stringResource(R.string.data_cache_detail)) { navigate(Screen.DATA_CACHE) } }
-                item { ToolNavigationCard(Icons.Default.Close, stringResource(R.string.rare_apps_title), stringResource(R.string.rare_apps_detail)) { navigate(Screen.RARE_APPS) } }
-                item { ToolNavigationCard(Icons.Default.Settings, stringResource(R.string.resources_title), stringResource(R.string.resources_detail)) { navigate(Screen.RESOURCES) } }
-                item { SectionHeading(stringResource(R.string.recent_dexopt_apps)); TextButton(onClick = { navigate(Screen.DEXOPT) }) {
-                    Text(stringResource(R.string.view_all_dexopt_apps))
-                } }
-                if (state.run.id != 0L) {
-                    item { Text(stringResource(R.string.results), style = MaterialTheme.typography.titleLarge) }
-                    items(state.run.results, key = { it.action.key }) { ResultCard(it) }
-                }
+                item { RecentAppsCard(state.run.packages, state.run.packagesTruncated) { navigate(Screen.DEXOPT) } }
                 if (state.lastReport.isNotBlank()) item {
-                    TextButton(onClick = { history = !history }) { Text(stringResource(R.string.last_report)) }
+                    FilledTonalButton(onClick = { history = !history }, shape = RoundedCornerShape(50)) {
+                        Text(stringResource(R.string.last_report))
+                    }
                     if (history) SelectionContainer { Text(state.lastReport, style = MaterialTheme.typography.bodySmall) }
                 }
                 item { Text(stringResource(R.string.scope_note), style = MaterialTheme.typography.bodySmall,
@@ -219,15 +255,69 @@ private fun StatusPanel(state: OptimizerUiState) {
 }
 
 @Composable
+private fun ProfileOption(profile: Profile, current: Profile, enabled: Boolean,
+    modifier: Modifier, onClick: () -> Unit) {
+    val selected = profile == current
+    val container by animateColorAsState(if (selected) MaterialTheme.colorScheme.primaryContainer
+        else MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp), label = "profileColor")
+    Surface(modifier = modifier, shape = if (selected) RoundedCornerShape(32.dp)
+        else if (profile == Profile.QUICK) RoundedCornerShape(topStart = 32.dp, bottomStart = 32.dp, topEnd = 12.dp, bottomEnd = 12.dp)
+        else RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp, topEnd = 32.dp, bottomEnd = 32.dp),
+        color = container, contentColor = (if (selected) MaterialTheme.colorScheme.onPrimaryContainer
+            else MaterialTheme.colorScheme.onSurfaceVariant).copy(alpha = if (enabled) 1f else 0.38f)) {
+        Column(Modifier.selectable(selected = selected, enabled = enabled, role = Role.RadioButton,
+            onClick = onClick).padding(horizontal = 16.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(if (selected) Icons.Default.Check else if (profile == Profile.QUICK) Icons.Default.PlayArrow else Icons.Default.Build,
+                contentDescription = null, modifier = Modifier.size(28.dp))
+            Text(stringResource(if (profile == Profile.QUICK) R.string.quick else R.string.deep),
+                style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+        }
+    }
+}
+
+@Composable
+private fun RecentAppsCard(packages: List<PackageResult>, truncated: Boolean, open: () -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                Text(stringResource(R.string.recent_dexopt_apps), style = MaterialTheme.typography.titleMedium)
+                Text(if (packages.isEmpty()) stringResource(R.string.no_dexopt_apps) else stringResource(R.string.recent_apps_count, packages.size, if (truncated) " +" else ""), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            TextButton(onClick = open) { Text(stringResource(R.string.view_all_dexopt_apps)) }
+        }
+    }
+}
+
+@Composable
+private fun ToolsScreen(onBack: () -> Unit, bottomBar: @Composable () -> Unit, navigate: (Screen) -> Unit) {
+    ToolScaffold(stringResource(R.string.other_tools), onBack, {}, bottomBar = bottomBar) {
+        item { Text(stringResource(R.string.other_tools_detail), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        item { ToolNavigationCard(Icons.Default.Delete, stringResource(R.string.data_cache_title), stringResource(R.string.data_cache_detail)) { navigate(Screen.DATA_CACHE) } }
+        item { ToolNavigationCard(Icons.Default.Close, stringResource(R.string.rare_apps_title), stringResource(R.string.rare_apps_detail)) { navigate(Screen.RARE_APPS) } }
+        item { ToolNavigationCard(Icons.Default.Settings, stringResource(R.string.resources_title), stringResource(R.string.resources_detail)) { navigate(Screen.RESOURCES) } }
+    }
+}
+
+@Composable
+private fun ResultsScreen(run: Run, onBack: () -> Unit) {
+    ToolScaffold(stringResource(R.string.results), onBack, {}) {
+        item { Text(stringResource(R.string.run_result_detail), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        items(run.results, key = { "result:${it.action.key}" }) { ResultCard(it) }
+    }
+}
+
+@Composable
 private fun AppCacheScreen(state: OptimizerUiState, viewModel: OptimizerViewModel, onBack: () -> Unit) {
     val tool = state.tools.getValue(Tool.APP_CACHE)
     ToolScaffold(stringResource(R.string.cache_title), onBack, {
-        ToolActionButton(tool, stringResource(R.string.scan_apps), state.connected && !state.busy) { viewModel.startTool(Tool.APP_CACHE) }
+        ToolActionButton(tool, stringResource(R.string.scan_apps), state.connected && state.editable) { viewModel.startTool(Tool.APP_CACHE) }
     }) {
         item { Text(stringResource(R.string.app_cache_screen_detail), color = MaterialTheme.colorScheme.onSurfaceVariant) }
         if (tool.detail.isNotBlank()) item { Text(tool.detail) }
         items(tool.rows, key = { it.id }) { row ->
-            SelectableToolRow(row, row.id in state.plan.cachePackages, !state.run.active && !tool.active) { viewModel.selectAppCache(row.id, it) }
+            SelectableToolRow(row, row.id in state.plan.cachePackages, state.editable && !tool.active) { viewModel.selectAppCache(row.id, it) }
         }
     }
 }
@@ -276,16 +366,20 @@ private fun ResourceScreen(state: OptimizerUiState, viewModel: OptimizerViewMode
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ToolScaffold(title: String, onBack: () -> Unit, actions: @Composable () -> Unit,
+    bottomBar: (@Composable () -> Unit)? = null,
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
     BackHandler(onBack = onBack)
     Scaffold(
         topBar = { TopAppBar(title = { Text(title) }, navigationIcon = {
             IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, stringResource(R.string.back)) }
         }) },
-        bottomBar = { Surface { Box(Modifier.navigationBarsPadding().fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { actions() } } },
+        bottomBar = bottomBar ?: { Surface { Box(Modifier.navigationBarsPadding().fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { actions() } } },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
-            LazyColumn(Modifier.fillMaxSize().widthIn(max = 600.dp), contentPadding = PaddingValues(20.dp),
+        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+            .padding(top = padding.calculateTopPadding()), contentAlignment = Alignment.TopCenter) {
+            LazyColumn(Modifier.fillMaxSize().widthIn(max = 600.dp),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp,
+                    bottom = padding.calculateBottomPadding() + 20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
         }
     }
@@ -333,10 +427,12 @@ private fun ResourceRow(row: ToolRow) {
 @Composable
 private fun AppCacheMaintenanceCard(selected: Boolean, count: Int, enabled: Boolean,
     toggle: (Boolean) -> Unit, configure: () -> Unit) {
-    Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Card(Modifier.fillMaxWidth(), colors = maintenanceCardColors()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ToggleRow(stringResource(R.string.cache_title), stringResource(R.string.cache_detail), selected, enabled, toggle)
         Text(stringResource(R.string.cache_selected_count, count), style = MaterialTheme.typography.bodySmall)
-        OutlinedButton(onClick = configure) { Icon(Icons.Default.Settings, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.choose_apps)) }
+        OutlinedButton(onClick = configure, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
+            Icon(Icons.Default.Settings, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.choose_apps))
+        }
     } }
 }
 
@@ -346,7 +442,7 @@ private fun ToolNavigationCard(icon: androidx.compose.ui.graphics.vector.ImageVe
         horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         Icon(icon, null)
         Column(Modifier.weight(1f)) { Text(title, style = MaterialTheme.typography.titleMedium); Text(detail, style = MaterialTheme.typography.bodySmall) }
-        Icon(Icons.Default.PlayArrow, null)
+        Icon(painterResource(R.drawable.ic_chevron_right), null)
     } }
 }
 
@@ -355,10 +451,11 @@ private fun ActionCard(action: Action, plan: Plan, enabled: Boolean, toggle: (Bo
     edit: ((Plan) -> Plan) -> Unit) {
     var expanded by rememberSaveable(action.key) { mutableStateOf(false) }
     val selected = action in plan.selected
-    Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Card(Modifier.fillMaxWidth(), colors = maintenanceCardColors()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         ToggleRow(stringResource(actionTitle(action)), stringResource(actionDetail(action)), selected, enabled, toggle)
         if (action == Action.DEXOPT) {
-            TextButton(onClick = { expanded = !expanded }, enabled = enabled && selected) { Text(stringResource(R.string.configure)) }
+            OutlinedButton(onClick = { expanded = !expanded }, enabled = enabled && selected,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) { Text(stringResource(R.string.configure)) }
             if (expanded) {
                 ToggleRow(stringResource(R.string.adaptive_compile), stringResource(R.string.adaptive_detail),
                     plan.adaptiveCompilation, enabled && selected) { value -> edit { it.copy(adaptiveCompilation = value, fullCompilation = false, profile = Profile.CUSTOM) } }
@@ -368,6 +465,12 @@ private fun ActionCard(action: Action, plan: Plan, enabled: Boolean, toggle: (Bo
         }
     } }
 }
+
+@Composable
+private fun maintenanceCardColors() = CardDefaults.cardColors(
+    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+    contentColor = MaterialTheme.colorScheme.onSurface,
+)
 
 @Composable
 private fun ToggleRow(title: String, detail: String, checked: Boolean, enabled: Boolean, change: (Boolean) -> Unit) {
