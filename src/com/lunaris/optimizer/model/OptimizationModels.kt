@@ -50,6 +50,7 @@ data class ToolRow(
     val memoryMb: Int = 0,
     val background: Boolean = false,
     val selectable: Boolean = true,
+    val storageBytes: Long? = null,
 )
 
 data class ToolState(
@@ -77,6 +78,8 @@ data class ToolState(
                     memoryMb = row.getInt("memory_mb"),
                     background = row.getBoolean("background"),
                     selectable = row.getBoolean("selectable", true),
+                    storageBytes = if (row.containsKey("storage_bytes"))
+                        row.getLong("storage_bytes").coerceAtLeast(0L) else null,
                 )
             },
         )

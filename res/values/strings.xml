@@ -80,6 +80,14 @@
     <string name="cache_selected_count">%1$d apps selected</string>
     <string name="select_cache_apps_first">Choose at least one app before running App Cache Cleaner.</string>
     <string name="app_cache_screen_detail">Cache sizes are measured for installed owner-user apps. Select only the app caches you want included in Main Maintenance.</string>
+    <string name="total_app_cache">Total app cache</string>
+    <string name="cache_selected_size">%1$s selected for cleanup</string>
+    <string name="app_storage_size">Apps &amp; data · %1$s</string>
+    <string name="app_cache_size">Cache · %1$s</string>
+    <string name="cache_storage_description">Apps and data excluding cache: %1$s. Cache: %2$s.</string>
+    <string name="app_storage_unavailable">App storage size unavailable.</string>
+    <string name="scanning_app_cache">Scanning app cache…</string>
+    <string name="cache_scan_required">Scan apps to measure cache usage.</string>
     <string name="data_cache_title">Data Cache Cleaner</string>
     <string name="data_cache_detail">Clean the system resource and package cache directories.</string>
     <string name="data_cache_paths">Cleans the contents of /data/resources_cache and /data/system/package_cache. The directories themselves are preserved.</string>
