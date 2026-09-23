@@ -11,6 +11,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -313,11 +314,20 @@ private fun AppCacheScreen(state: OptimizerUiState, viewModel: OptimizerViewMode
     val tool = state.tools.getValue(Tool.APP_CACHE)
     ToolScaffold(stringResource(R.string.cache_title), onBack, {
         ToolActionButton(tool, stringResource(R.string.scan_apps), state.connected && state.editable) { viewModel.startTool(Tool.APP_CACHE) }
-    }) {
-        item { Text(stringResource(R.string.app_cache_screen_detail), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        if (tool.detail.isNotBlank()) item { Text(tool.detail) }
-        items(tool.rows, key = { it.id }) { row ->
-            SelectableToolRow(row, row.id in state.plan.cachePackages, state.editable && !tool.active) { viewModel.selectAppCache(row.id, it) }
+    }, verticalArrangement = Arrangement.Top) {
+        item(key = "summary:app_cache") {
+            AppCacheSummary(tool, state.plan.cachePackages)
+            Spacer(Modifier.height(16.dp))
+        }
+        item { Text(stringResource(R.string.app_cache_screen_detail),
+            modifier = Modifier.padding(bottom = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        if (tool.detail.isNotBlank()) item { Text(tool.detail, modifier = Modifier.padding(bottom = 16.dp)) }
+        itemsIndexed(tool.rows, key = { _, row -> row.id }) { index, row ->
+            AppCacheRow(row, row.id in state.plan.cachePackages,
+                state.editable && !tool.active && row.selectable,
+                first = index == 0, last = index == tool.rows.lastIndex) {
+                viewModel.selectAppCache(row.id, it)
+            }
         }
     }
 }
@@ -367,6 +377,7 @@ private fun ResourceScreen(state: OptimizerUiState, viewModel: OptimizerViewMode
 @Composable
 private fun ToolScaffold(title: String, onBack: () -> Unit, actions: @Composable () -> Unit,
     bottomBar: (@Composable () -> Unit)? = null,
+    verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(12.dp),
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
     BackHandler(onBack = onBack)
     Scaffold(
@@ -380,7 +391,7 @@ private fun ToolScaffold(title: String, onBack: () -> Unit, actions: @Composable
             LazyColumn(Modifier.fillMaxSize().widthIn(max = 600.dp),
                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp,
                     bottom = padding.calculateBottomPadding() + 20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+                verticalArrangement = verticalArrangement, content = content)
         }
     }
 }
