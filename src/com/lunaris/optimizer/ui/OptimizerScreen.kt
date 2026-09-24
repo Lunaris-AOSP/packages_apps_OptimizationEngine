@@ -297,6 +297,7 @@ private fun MainScreen(state: OptimizerUiState, viewModel: OptimizerViewModel, o
                     Box(Modifier.padding(16.dp)) { ToggleRow(
                         stringResource(R.string.continue_errors), stringResource(R.string.continue_detail),
                         state.plan.continueOnError, state.editable,
+                        icon = { Icon(painterResource(R.drawable.ic_skip_next), null) },
                     ) { enabled -> viewModel.edit { it.copy(continueOnError = enabled) } } }
                 } }
                 if (!cacheSelectionValid) item { Text(stringResource(R.string.select_cache_apps_first), color = MaterialTheme.colorScheme.error) }
@@ -356,8 +357,10 @@ private fun ProfileOption(profile: Profile, current: Profile, enabled: Boolean,
         Column(Modifier.selectable(selected = selected, enabled = enabled, role = Role.RadioButton,
             onClick = hapticClick(onClick)).padding(horizontal = 16.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(if (selected) Icons.Default.Check else if (profile == Profile.QUICK) Icons.Default.PlayArrow else Icons.Default.Build,
-                contentDescription = null, modifier = Modifier.size(28.dp))
+            OptionIconBackground(enabled) {
+                Icon(if (selected) Icons.Default.Check else if (profile == Profile.QUICK) Icons.Default.PlayArrow else Icons.Default.Build,
+                    contentDescription = null, modifier = Modifier.size(24.dp))
+            }
             Text(stringResource(if (profile == Profile.QUICK) R.string.quick else R.string.deep),
                 style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
         }
@@ -368,7 +371,7 @@ private fun ProfileOption(profile: Profile, current: Profile, enabled: Boolean,
 private fun RecentAppsCard(packages: List<PackageResult>, truncated: Boolean, open: () -> Unit) {
     Card(Modifier.fillMaxWidth()) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+            OptionIconBackground { Icon(Icons.Default.Check, null) }
             Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(stringResource(R.string.recent_dexopt_apps), style = MaterialTheme.typography.titleMedium)
                 Text(if (packages.isEmpty()) stringResource(R.string.no_dexopt_apps) else stringResource(R.string.recent_apps_count, packages.size, if (truncated) " +" else ""), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -527,10 +530,11 @@ private fun ResourceRow(row: ToolRow) {
 private fun AppCacheMaintenanceCard(selected: Boolean, count: Int, enabled: Boolean,
     toggle: (Boolean) -> Unit, configure: () -> Unit) {
     Card(Modifier.fillMaxWidth(), colors = maintenanceCardColors()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        ToggleRow(stringResource(R.string.cache_title), stringResource(R.string.cache_detail), selected, enabled, toggle)
+        ToggleRow(stringResource(R.string.cache_title), stringResource(R.string.cache_detail), selected, enabled,
+            icon = { ActionIcon(Action.CACHE) }, change = toggle)
         Text(stringResource(R.string.cache_selected_count, count), style = MaterialTheme.typography.bodySmall)
         OutlinedButton(onClick = hapticClick(configure), border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
-            Icon(Icons.Default.Settings, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.choose_apps))
+            Text(stringResource(R.string.choose_apps))
         }
     } }
 }
@@ -539,9 +543,8 @@ private fun AppCacheMaintenanceCard(selected: Boolean, count: Int, enabled: Bool
 private fun ToolNavigationCard(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, detail: String, open: () -> Unit) {
     Card(onClick = hapticClick(open), modifier = Modifier.fillMaxWidth()) { Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        Icon(icon, null)
+        OptionIconBackground { Icon(icon, null) }
         Column(Modifier.weight(1f)) { Text(title, style = MaterialTheme.typography.titleMedium); Text(detail, style = MaterialTheme.typography.bodySmall) }
-        Icon(painterResource(R.drawable.ic_chevron_right), null)
     } }
 }
 
@@ -551,15 +554,18 @@ private fun ActionCard(action: Action, plan: Plan, enabled: Boolean, toggle: (Bo
     var expanded by rememberSaveable(action.key) { mutableStateOf(false) }
     val selected = action in plan.selected
     Card(Modifier.fillMaxWidth(), colors = maintenanceCardColors()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        ToggleRow(stringResource(actionTitle(action)), stringResource(actionDetail(action)), selected, enabled, toggle)
+        ToggleRow(stringResource(actionTitle(action)), stringResource(actionDetail(action)), selected, enabled,
+            icon = { ActionIcon(action) }, change = toggle)
         if (action == Action.DEXOPT) {
             OutlinedButton(onClick = hapticClick { expanded = !expanded }, enabled = enabled && selected,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) { Text(stringResource(R.string.configure)) }
             if (expanded) {
                 ToggleRow(stringResource(R.string.adaptive_compile), stringResource(R.string.adaptive_detail),
-                    plan.adaptiveCompilation, enabled && selected) { value -> edit { it.copy(adaptiveCompilation = value, fullCompilation = false, profile = Profile.CUSTOM) } }
+                    plan.adaptiveCompilation, enabled && selected,
+                    icon = { Icon(Icons.Default.Refresh, null) }) { value -> edit { it.copy(adaptiveCompilation = value, fullCompilation = false, profile = Profile.CUSTOM) } }
                 ToggleRow(stringResource(R.string.full_compile), stringResource(R.string.deep_warning),
-                    plan.fullCompilation, enabled && selected && !plan.adaptiveCompilation) { value -> edit { it.copy(fullCompilation = value, profile = Profile.CUSTOM) } }
+                    plan.fullCompilation, enabled && selected && !plan.adaptiveCompilation,
+                    icon = { Icon(Icons.Default.Build, null) }) { value -> edit { it.copy(fullCompilation = value, profile = Profile.CUSTOM) } }
             }
         }
     } }
@@ -572,7 +578,27 @@ private fun maintenanceCardColors() = CardDefaults.cardColors(
 )
 
 @Composable
-private fun ToggleRow(title: String, detail: String, checked: Boolean, enabled: Boolean, change: (Boolean) -> Unit) {
+private fun OptionIconBackground(enabled: Boolean = true, content: @Composable () -> Unit) {
+    Surface(modifier = Modifier.size(40.dp), shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = if (enabled) 1f else 0.38f),
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = if (enabled) 1f else 0.38f)) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { content() }
+    }
+}
+
+@Composable
+private fun ActionIcon(action: Action) {
+    when (action) {
+        Action.CACHE -> Icon(Icons.Default.Delete, null)
+        Action.TRIM -> Icon(painterResource(R.drawable.ic_storage), null)
+        Action.ZRAM -> Icon(painterResource(R.drawable.ic_memory), null)
+        Action.DEXOPT -> Icon(Icons.Default.Build, null)
+    }
+}
+
+@Composable
+private fun ToggleRow(title: String, detail: String, checked: Boolean, enabled: Boolean,
+    icon: @Composable () -> Unit, change: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(
         value = checked,
         enabled = enabled,
@@ -580,6 +606,7 @@ private fun ToggleRow(title: String, detail: String, checked: Boolean, enabled: 
         onValueChange = hapticToggle(change),
     ),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        OptionIconBackground(enabled, icon)
         Column(Modifier.weight(1f)) { Text(title, style = MaterialTheme.typography.titleMedium); Text(detail, style = MaterialTheme.typography.bodySmall) }
         Switch(checked, null, enabled = enabled, thumbContent = { Icon(if (checked) Icons.Default.Check else Icons.Default.Close, null, Modifier.size(16.dp)) })
     }
