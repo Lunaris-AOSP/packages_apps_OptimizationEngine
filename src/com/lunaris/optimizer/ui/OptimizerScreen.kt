@@ -6,7 +6,18 @@
 package com.lunaris.optimizer.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,18 +41,24 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lunaris.optimizer.OptimizerUiState
@@ -51,29 +68,100 @@ import com.lunaris.optimizer.model.*
 
 private enum class Screen { MAIN, TOOLS, RESULTS, APP_CACHE, DATA_CACHE, RARE_APPS, RESOURCES, DEXOPT }
 
+private val Screen.isTopLevel: Boolean get() = this == Screen.MAIN || this == Screen.TOOLS
+
+private val BackStackSaver = listSaver<List<Screen>, String>(
+    save = { stack -> stack.map { it.name } },
+    restore = { names -> names.map { Screen.valueOf(it) } },
+)
+
+// Material motion: fade through between peers, shared X axis within a hierarchy.
+private val MotionEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+private val EnterEasing = CubicBezierEasing(0f, 0f, 0f, 1f)
+private val ExitEasing = CubicBezierEasing(0.3f, 0f, 1f, 1f)
+
+private fun pageTransition(forward: Boolean, slideDistance: Int): ContentTransform {
+    val offset = if (forward) slideDistance else -slideDistance
+    return (slideInHorizontally(tween(300, easing = MotionEasing)) { offset } +
+        fadeIn(tween(210, delayMillis = 90, easing = EnterEasing))) togetherWith
+        (slideOutHorizontally(tween(300, easing = MotionEasing)) { -offset } +
+            fadeOut(tween(90, easing = ExitEasing)))
+}
+
+private fun tabTransition(): ContentTransform =
+    (fadeIn(tween(195, delayMillis = 105, easing = EnterEasing)) +
+        scaleIn(tween(195, delayMillis = 105, easing = EnterEasing), initialScale = 0.92f)) togetherWith
+        fadeOut(tween(105, easing = ExitEasing))
+
 @Composable
 fun OptimizerScreen(viewModel: OptimizerViewModel, onBack: () -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    var screen by rememberSaveable { mutableStateOf(Screen.MAIN) }
-    val navigateBack = { if (screen == Screen.MAIN) onBack() else screen = Screen.MAIN }
-    // Keep the spring alive while Main and Tools replace one another.
-    val selectedTab = if (screen == Screen.TOOLS) 1 else 0
+    var backStack by rememberSaveable(stateSaver = BackStackSaver) { mutableStateOf(listOf(Screen.MAIN)) }
+    val screen = backStack.last()
+    val navigateBack: () -> Unit = {
+        if (backStack.size > 1) backStack = backStack.dropLast(1) else onBack()
+    }
+    // One handler avoids outgoing pages intercepting Back during a transition.
+    BackHandler(enabled = backStack.size > 1, onBack = navigateBack)
+    val pageStates = rememberSaveableStateHolder()
+    val selectedTab = if (Screen.TOOLS in backStack) 1 else 0
     val navigationSegments = rememberElasticSegments(2, selectedTab)
     val bottomBar: @Composable () -> Unit = {
         FloatingBottomNavigation(selectedTab, navigationSegments) {
-            screen = if (it == 0) Screen.MAIN else Screen.TOOLS
+            if (backStack.last().isTopLevel) {
+                backStack = if (it == 0) listOf(Screen.MAIN) else listOf(Screen.MAIN, Screen.TOOLS)
+            }
         }
     }
+    val slideDistance = with(LocalDensity.current) { 30.dp.roundToPx() } *
+        if (LocalLayoutDirection.current == LayoutDirection.Rtl) -1 else 1
 
-    when (screen) {
-        Screen.MAIN -> MainScreen(state, viewModel, onBack, bottomBar) { screen = it }
-        Screen.TOOLS -> ToolsScreen(navigateBack, bottomBar) { screen = it }
-        Screen.RESULTS -> ResultsScreen(state.run, navigateBack)
-        Screen.APP_CACHE -> AppCacheScreen(state, viewModel, navigateBack)
-        Screen.DATA_CACHE -> DataCacheScreen(state, viewModel, navigateBack)
-        Screen.RARE_APPS -> RareAppsScreen(state, viewModel, navigateBack)
-        Screen.RESOURCES -> ResourceScreen(state, viewModel, navigateBack)
-        Screen.DEXOPT -> DexoptAppsScreen(state.run, navigateBack)
+    AnimatedContent(
+        targetState = backStack,
+        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).clipToBounds(),
+        transitionSpec = { pageTransition(targetState.size > initialState.size, slideDistance).using(sizeTransform = null) },
+        // Home and Extras share a shell so their bottom bar stays in place.
+        contentKey = { stack -> if (stack.last().isTopLevel) "tabs" else stack.last().name },
+        label = "pageNavigation",
+    ) { visibleStack ->
+        val destination = visibleStack.last()
+        // Ignore stale page callbacks while that page is animating out.
+        val pageBack: () -> Unit = { if (backStack == visibleStack) navigateBack() }
+        val navigate: (Screen) -> Unit = { next ->
+            if (backStack == visibleStack && next != destination) backStack = backStack + next
+        }
+        if (destination.isTopLevel) {
+            Scaffold(bottomBar = bottomBar, contentWindowInsets = WindowInsets(0)) { padding ->
+                AnimatedContent(
+                    targetState = destination,
+                    modifier = Modifier.fillMaxSize().clipToBounds(),
+                    transitionSpec = { tabTransition().using(sizeTransform = null) },
+                    label = "tabNavigation",
+                ) { tab ->
+                    pageStates.SaveableStateProvider(tab.name) {
+                        val tabBack: () -> Unit = { if (backStack.last() == tab) pageBack() }
+                        val tabNavigate: (Screen) -> Unit = { next -> if (backStack.last() == tab) navigate(next) }
+                        when (tab) {
+                            Screen.MAIN -> MainScreen(state, viewModel, tabBack, padding.calculateBottomPadding(), tabNavigate)
+                            Screen.TOOLS -> ToolsScreen(tabBack, padding.calculateBottomPadding(), tabNavigate)
+                            else -> Unit
+                        }
+                    }
+                }
+            }
+        } else {
+            pageStates.SaveableStateProvider(destination.name) {
+                when (destination) {
+                    Screen.RESULTS -> ResultsScreen(state.run, pageBack)
+                    Screen.APP_CACHE -> AppCacheScreen(state, viewModel, pageBack)
+                    Screen.DATA_CACHE -> DataCacheScreen(state, viewModel, pageBack)
+                    Screen.RARE_APPS -> RareAppsScreen(state, viewModel, pageBack)
+                    Screen.RESOURCES -> ResourceScreen(state, viewModel, pageBack)
+                    Screen.DEXOPT -> DexoptAppsScreen(state.run, pageBack)
+                    else -> Unit
+                }
+            }
+        }
     }
 
     val toolError = state.error
@@ -99,7 +187,7 @@ fun OptimizerScreen(viewModel: OptimizerViewModel, onBack: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MainScreen(state: OptimizerUiState, viewModel: OptimizerViewModel, onBack: () -> Unit,
-    bottomBar: @Composable () -> Unit,
+    bottomPadding: Dp,
     navigate: (Screen) -> Unit) {
     var history by rememberSaveable { mutableStateOf(false) }
     val cacheSelectionValid = Action.CACHE !in state.plan.selected || state.plan.cachePackages.isNotEmpty()
@@ -113,14 +201,13 @@ private fun MainScreen(state: OptimizerUiState, viewModel: OptimizerViewModel, o
                 Icon(Icons.Default.Refresh, stringResource(R.string.refresh))
             } },
         ) },
-        bottomBar = bottomBar,
     ) { padding ->
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
             .padding(top = padding.calculateTopPadding()), contentAlignment = Alignment.TopCenter) {
             LazyColumn(
                 Modifier.widthIn(max = 600.dp).fillMaxSize(),
                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp,
-                    bottom = padding.calculateBottomPadding() + 12.dp),
+                    bottom = bottomPadding + 12.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 item { Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineLarge,
@@ -292,8 +379,8 @@ private fun RecentAppsCard(packages: List<PackageResult>, truncated: Boolean, op
 }
 
 @Composable
-private fun ToolsScreen(onBack: () -> Unit, bottomBar: @Composable () -> Unit, navigate: (Screen) -> Unit) {
-    ToolScaffold(stringResource(R.string.other_tools), onBack, {}, bottomBar = bottomBar) {
+private fun ToolsScreen(onBack: () -> Unit, bottomPadding: Dp, navigate: (Screen) -> Unit) {
+    ToolScaffold(stringResource(R.string.other_tools), onBack, {}, bottomPadding = bottomPadding) {
         item { Text(stringResource(R.string.other_tools_detail), color = MaterialTheme.colorScheme.onSurfaceVariant) }
         item { ToolNavigationCard(Icons.Default.Delete, stringResource(R.string.data_cache_title), stringResource(R.string.data_cache_detail)) { navigate(Screen.DATA_CACHE) } }
         item { ToolNavigationCard(Icons.Default.Close, stringResource(R.string.rare_apps_title), stringResource(R.string.rare_apps_detail)) { navigate(Screen.RARE_APPS) } }
@@ -376,21 +463,22 @@ private fun ResourceScreen(state: OptimizerUiState, viewModel: OptimizerViewMode
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ToolScaffold(title: String, onBack: () -> Unit, actions: @Composable () -> Unit,
-    bottomBar: (@Composable () -> Unit)? = null,
+    bottomPadding: Dp? = null,
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(12.dp),
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit) {
-    BackHandler(onBack = onBack)
     Scaffold(
         topBar = { TopAppBar(title = { Text(title) }, navigationIcon = {
             IconButton(onClick = hapticClick(onBack)) { Icon(Icons.Default.ArrowBack, stringResource(R.string.back)) }
         }) },
-        bottomBar = bottomBar ?: { Surface { Box(Modifier.navigationBarsPadding().fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { actions() } } },
+        bottomBar = { if (bottomPadding == null) {
+            Surface { Box(Modifier.navigationBarsPadding().fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { actions() } }
+        } },
     ) { padding ->
         Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
             .padding(top = padding.calculateTopPadding()), contentAlignment = Alignment.TopCenter) {
             LazyColumn(Modifier.fillMaxSize().widthIn(max = 600.dp),
                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 20.dp,
-                    bottom = padding.calculateBottomPadding() + 20.dp),
+                    bottom = (bottomPadding ?: padding.calculateBottomPadding()) + 20.dp),
                 verticalArrangement = verticalArrangement, content = content)
         }
     }
