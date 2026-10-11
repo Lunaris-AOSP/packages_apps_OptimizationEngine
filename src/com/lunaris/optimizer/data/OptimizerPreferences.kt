@@ -6,10 +6,12 @@
 package com.lunaris.optimizer.data
 
 import android.content.Context
+import android.provider.Settings
 import com.lunaris.optimizer.model.*
 
 class OptimizerPreferences(context: Context) {
     private val store = context.getSharedPreferences("optimizer", Context.MODE_PRIVATE)
+    private val bootCount = Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT, -1)
     fun read(): Plan {
         val profile = Profile.entries.find { it.name == store.getString("profile", "QUICK") } ?: Profile.QUICK
         val preset = Plan.forProfile(profile)
@@ -23,13 +25,18 @@ class OptimizerPreferences(context: Context) {
             continueOnError = store.getBoolean("continue", true),
         )
     }
-    fun clearedCacheRun(): Long = store.getLong("cleared_cache_run", 0L)
+    // Service run IDs restart at 1 after reboot; only reuse the marker from this boot.
+    fun clearedCacheRun(): Long = if (bootCount >= 0
+        && store.getInt("cleared_cache_boot_count", -1) == bootCount) {
+        store.getLong("cleared_cache_run", 0L)
+    } else 0L
     fun write(plan: Plan, clearedCacheRun: Long) {
         store.edit().putStringSet("actions", plan.selected.map { it.key }.toSet())
             .putBoolean("adaptive", plan.adaptiveCompilation)
             .putString("profile", plan.profile.name).putBoolean("full", plan.fullCompilation)
             .putStringSet("cache_packages", plan.cachePackages)
             .putLong("cleared_cache_run", clearedCacheRun)
+            .putInt("cleared_cache_boot_count", bootCount)
             .putBoolean("continue", plan.continueOnError).apply()
     }
     fun lastReport(): String = store.getString("last_report", "") ?: ""
