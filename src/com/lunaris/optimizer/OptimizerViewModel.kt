@@ -27,6 +27,7 @@ data class OptimizerUiState(
     val confirm: Boolean = false,
     val lastReport: String = "",
     val tools: Map<Tool, ToolState> = Tool.entries.associateWith { ToolState(it) },
+    val resourceLiveUpdates: Boolean = false,
     val selectedRareApps: Set<String> = emptySet(),
     val restartPrompt: Boolean = false,
     val dismissedResultRunId: Long = 0,
@@ -46,6 +47,8 @@ class OptimizerViewModel(application: Application) : AndroidViewModel(applicatio
     private val refreshLock = Mutex()
     private var promptedDataRun = 0L
     private var clearedCacheRun = 0L
+    private var resourceScreenActive = false
+    private var nextResourceSampleAt = 0L
     // Poll only while the screen has lifecycle-aware subscribers. A snapshot reattaches after process death.
     val uiState = flow {
         if (!initialized) {
@@ -91,7 +94,15 @@ class OptimizerViewModel(application: Application) : AndroidViewModel(applicatio
             }
             Tool.entries.forEach { tool ->
                 try {
-                    val toolState = repository.toolSnapshot(tool, state.value.tools[tool])
+                    val previous = state.value.tools.getValue(tool)
+                    val snapshot = repository.toolSnapshot(tool, previous)
+                    // Keep the last readings visible while the next resource sample is running.
+                    val toolState = if (tool == Tool.RESOURCES && snapshot.status in setOf("running", "failed"))
+                        snapshot.copy(rows = previous.rows,
+                            detail = if (snapshot.active) previous.detail else snapshot.detail) else snapshot
+                    if (tool == Tool.RESOURCES && previous.active && toolState.status == "failed") {
+                        state.update { it.copy(resourceLiveUpdates = false) }
+                    }
                     state.update { current ->
                         current.copy(
                             tools = current.tools + (tool to toolState),
@@ -108,9 +119,13 @@ class OptimizerViewModel(application: Application) : AndroidViewModel(applicatio
                     }
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) {
-                    state.update { it.copy(error = "${tool.key}: ${e.message ?: "Unable to refresh tool results"}") }
+                    state.update { it.copy(
+                        resourceLiveUpdates = it.resourceLiveUpdates && tool != Tool.RESOURCES,
+                        error = "${tool.key}: ${e.message ?: "Unable to refresh tool results"}",
+                    ) }
                 }
             }
+            refreshLiveResources()
             if (run.id != 0L && !run.active && savedRun != run.id) {
                 val report = java.text.DateFormat.getDateTimeInstance().format(java.util.Date()) + "\n" +
                     run.status + "\n" + run.results.joinToString("\n") { "${it.action.key}: ${it.status} — ${it.detail}" } + "\n" +
@@ -122,6 +137,34 @@ class OptimizerViewModel(application: Application) : AndroidViewModel(applicatio
             }
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { state.update { it.copy(connected = false, error = e.message ?: e.javaClass.simpleName) } }
+    }
+    fun setResourceScreenActive(active: Boolean) {
+        resourceScreenActive = active
+        if (active) nextResourceSampleAt = 0L
+    }
+    fun setResourceLiveUpdates(enabled: Boolean) {
+        state.update { it.copy(resourceLiveUpdates = enabled, error = if (enabled) null else it.error) }
+        if (enabled) nextResourceSampleAt = 0L
+    }
+    // Called under refreshLock so each sample finishes before another can be requested.
+    private suspend fun refreshLiveResources() {
+        val current = state.value
+        if (!resourceScreenActive || !current.resourceLiveUpdates || !current.connected || current.busy
+            || current.run.active || current.tools.values.any { it.active }
+            || SystemClock.elapsedRealtime() < nextResourceSampleAt) return
+        try {
+            val id = repository.startTool(Tool.RESOURCES)
+            nextResourceSampleAt = SystemClock.elapsedRealtime() + 2000L
+            state.update { latest ->
+                val previous = latest.tools.getValue(Tool.RESOURCES)
+                latest.copy(tools = latest.tools + (Tool.RESOURCES to previous.copy(
+                    id = id, status = "running", detail = if (previous.status == "failed") "" else previous.detail,
+                )))
+            }
+        } catch (e: CancellationException) { throw e }
+        catch (e: Exception) {
+            state.update { it.copy(resourceLiveUpdates = false, error = e.message ?: "Unable to update resource analysis") }
+        }
     }
     fun refreshMetrics() = viewModelScope.launch { refresh(true) }
     fun refreshMainScreen() {

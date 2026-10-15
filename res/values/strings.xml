@@ -101,9 +101,14 @@
     <string name="rare_apps_screen_detail">The scan lists stoppable apps with no foreground use in the last 24 hours that currently have a background process.</string>
     <string name="stop_selected">Stop selected</string>
     <string name="resources_title">System &amp; App Resource Analysis</string>
-    <string name="resources_detail">Rank running system processes and apps by memory and sampled CPU use.</string>
+    <string name="resources_detail">Monitor running system processes and apps with live memory and CPU updates.</string>
     <string name="resources_screen_detail">CPU is sampled over a short interval. RAM is proportional set size; background state comes from Android process importance.</string>
-    <string name="analyze_now">Analyze now</string>
+    <string name="resource_live_updates">Live updates</string>
+    <string name="resource_live_updates_on">Updates automatically while this page is open.</string>
+    <string name="resource_live_updates_off">Turn on to see live CPU and memory use.</string>
+    <string name="resource_updates_starting">Collecting CPU and memory data…</string>
+    <string name="resource_updates_active">Updating CPU and memory use…</string>
+    <string name="resource_updates_waiting">Updates will resume when the current task finishes.</string>
     <string name="resource_values">CPU %1$.1f%% · RAM %2$d MB · %3$s</string>
     <string name="background">Background</string>
     <string name="foreground">Foreground or service</string>

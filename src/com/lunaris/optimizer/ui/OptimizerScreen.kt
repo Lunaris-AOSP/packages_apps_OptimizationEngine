@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LifecycleStartEffect
 import com.lunaris.optimizer.OptimizerUiState
 import com.lunaris.optimizer.OptimizerViewModel
 import com.lunaris.optimizer.R
@@ -98,6 +99,10 @@ fun OptimizerScreen(viewModel: OptimizerViewModel, onBack: () -> Unit) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var backStack by rememberSaveable(stateSaver = BackStackSaver) { mutableStateOf(listOf(Screen.MAIN)) }
     val screen = backStack.last()
+    LifecycleStartEffect(screen, viewModel) {
+        viewModel.setResourceScreenActive(screen == Screen.RESOURCES)
+        onStopOrDispose { viewModel.setResourceScreenActive(false) }
+    }
     val navigateBack: () -> Unit = {
         if (backStack.size > 1) backStack = backStack.dropLast(1) else onBack()
     }
@@ -455,9 +460,24 @@ private fun RareAppsScreen(state: OptimizerUiState, viewModel: OptimizerViewMode
 private fun ResourceScreen(state: OptimizerUiState, viewModel: OptimizerViewModel, onBack: () -> Unit) {
     val tool = state.tools.getValue(Tool.RESOURCES)
     ToolScaffold(stringResource(R.string.resources_title), onBack, {
-        ToolActionButton(tool, stringResource(R.string.analyze_now), state.connected && !state.busy) { viewModel.startTool(Tool.RESOURCES) }
+        ToggleRow(
+            title = stringResource(R.string.resource_live_updates),
+            detail = stringResource(if (state.resourceLiveUpdates) R.string.resource_live_updates_on else R.string.resource_live_updates_off),
+            checked = state.resourceLiveUpdates,
+            enabled = true,
+            icon = { Icon(Icons.Default.Refresh, null) },
+            change = viewModel::setResourceLiveUpdates,
+        )
     }) {
         item { Text(stringResource(R.string.resources_screen_detail), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        if (state.resourceLiveUpdates) item {
+            Text(stringResource(when {
+                !state.connected -> R.string.connecting
+                state.run.active || state.busy || state.tools.any { (kind, value) -> kind != Tool.RESOURCES && value.active } -> R.string.resource_updates_waiting
+                tool.rows.isEmpty() -> R.string.resource_updates_starting
+                else -> R.string.resource_updates_active
+            }), color = MaterialTheme.colorScheme.primary)
+        }
         if (tool.detail.isNotBlank()) item { Text(tool.detail) }
         items(tool.rows, key = { it.id }) { ResourceRow(it) }
     }
