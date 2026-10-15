@@ -98,7 +98,7 @@
     <string name="restart_later">Later</string>
     <string name="rare_apps_title">Rarely Used App Management</string>
     <string name="rare_apps_detail">Find rarely used third-party apps that are still active in the background.</string>
-    <string name="rare_apps_screen_detail">The scan lists stoppable apps with no foreground use in the last 24 hours that currently have a background process.</string>
+    <string name="rare_apps_screen_detail">The scan lists stoppable apps with no foreground use in the last 6 hours that currently have a background process.</string>
     <string name="stop_selected">Stop selected</string>
     <string name="resources_title">System &amp; App Resource Analysis</string>
     <string name="resources_detail">Monitor running system processes and apps with live memory and CPU updates.</string>
