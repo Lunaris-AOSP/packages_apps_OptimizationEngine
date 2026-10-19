@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package com.lunaris.optimizer.ui
 
 import android.content.pm.PackageManager
@@ -67,18 +69,18 @@ internal fun AppCacheSummary(tool: ToolState, selectedPackages: Set<String>) {
     val cacheColor = MaterialTheme.colorScheme.tertiary
 
     Surface(modifier = Modifier.fillMaxWidth().animateContentSize(
-        animationSpec = tween(300, easing = FastOutSlowInEasing)), shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer) {
+        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec()), shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface) {
         Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(stringResource(R.string.total_app_cache), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.total_app_cache), style = MaterialTheme.typography.titleMediumEmphasized)
             Text(if (hasMeasurement && !tool.active) totalSize else "—",
-                style = MaterialTheme.typography.headlineLarge)
+                style = MaterialTheme.typography.displaySmallEmphasized)
             when {
                 tool.active -> {
                     Text(stringResource(R.string.scanning_app_cache), style = MaterialTheme.typography.bodyMedium)
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(12.dp),
-                        trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f))
+                    LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth(),
+                        trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                 }
                 hasMeasurement -> {
                     if (storageBytes != null) {
@@ -92,7 +94,13 @@ internal fun AppCacheSummary(tool: ToolState, selectedPackages: Set<String>) {
                     } else {
                         Text(stringResource(R.string.app_storage_unavailable), style = MaterialTheme.typography.bodyMedium)
                     }
-                    Text(stringResource(R.string.cache_selected_size, selectedSize), style = MaterialTheme.typography.bodyMedium)
+                    Surface(shape = MaterialTheme.shapes.medium,
+                        color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                        contentColor = MaterialTheme.colorScheme.onSurface) {
+                        Text(stringResource(R.string.cache_selected_size, selectedSize),
+                            style = MaterialTheme.typography.labelLargeEmphasized,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+                    }
                 }
                 else -> Text(stringResource(R.string.cache_scan_required), style = MaterialTheme.typography.bodyMedium)
             }
@@ -113,7 +121,7 @@ private fun CacheStorageBar(storageBytes: Long, cacheBytes: Long, storageColor: 
     LaunchedEffect(Unit) {
         reveal.animateTo(1f, tween(700, easing = FastOutSlowInEasing))
     }
-    val trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f)
+    val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
     Canvas(Modifier.fillMaxWidth().height(12.dp).semantics {
         contentDescription = description
         progressBarRangeInfo = ProgressBarRangeInfo(targetCacheFraction, 0f..1f)
@@ -151,17 +159,12 @@ internal fun AppCacheRow(row: ToolRow, selected: Boolean, enabled: Boolean,
     val context = LocalContext.current
     val backgroundColor by animateColorAsState(
         targetValue = if (selected) MaterialTheme.colorScheme.secondaryContainer
-            else MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp),
-        animationSpec = tween(200), label = "appCacheSelection",
+            else MaterialTheme.colorScheme.surfaceContainerLow,
+        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(), label = "appCacheSelection",
     )
     val cacheSize = stringResource(R.string.app_cache_size,
         Formatter.formatShortFileSize(context, row.bytes.coerceAtLeast(0L)))
-    val shape = RoundedCornerShape(
-        topStart = if (first) 24.dp else 0.dp,
-        topEnd = if (first) 24.dp else 0.dp,
-        bottomStart = if (last) 24.dp else 0.dp,
-        bottomEnd = if (last) 24.dp else 0.dp,
-    )
+    val shape = groupedCardShape(first, last)
     Column {
         Surface(modifier = Modifier.fillMaxWidth(), shape = shape,
             color = backgroundColor,
@@ -174,18 +177,19 @@ internal fun AppCacheRow(row: ToolRow, selected: Boolean, enabled: Boolean,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 AppCacheIcon(row.id)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(row.title, style = MaterialTheme.typography.titleMedium,
+                    Text(row.title, style = if (selected) MaterialTheme.typography.titleMediumEmphasized
+                        else MaterialTheme.typography.titleMedium,
                         maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Text(row.detail, style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(cacheSize,
-                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                        style = MaterialTheme.typography.labelLargeEmphasized, color = MaterialTheme.colorScheme.primary)
                 }
                 Checkbox(checked = selected, onCheckedChange = null, enabled = enabled)
             }
         }
-        if (!last) HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.background)
+        if (!last) Spacer(Modifier.height(4.dp))
     }
 }
 

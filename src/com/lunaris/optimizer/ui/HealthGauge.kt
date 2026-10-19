@@ -3,54 +3,73 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package com.lunaris.optimizer.ui
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.*
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import java.text.NumberFormat
 
 @Composable
 fun HealthGauge(progress: Float?, label: String, modifier: Modifier = Modifier) {
-    val value by animateFloatAsState(progress?.coerceIn(0f, 1f) ?: 0f, animationSpec = spring(dampingRatio = 0.8f, stiffness = 120f), label = "maintenanceProgress")
+    val target = progress?.coerceIn(0f, 1f) ?: 0f
+    val value by animateFloatAsState(target,
+        animationSpec = MaterialTheme.motionScheme.slowEffectsSpec(), label = "maintenanceProgress")
     val primary = MaterialTheme.colorScheme.primary
-    val track = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-    val gaugeSize = (208 * LocalDensity.current.fontScale.coerceIn(1f, 1.5f)).dp
-    Box(modifier.size(gaugeSize).semantics(mergeDescendants = true) {
-        if (progress != null) progressBarRangeInfo = ProgressBarRangeInfo(progress.coerceIn(0f, 1f), 0f..1f)
-    }, contentAlignment = Alignment.Center) {
-        Canvas(Modifier.fillMaxSize().padding(12.dp)) {
-            val stroke = 16.dp.toPx()
-            val offset = Offset(stroke / 2, stroke / 2)
-            val arcSize = Size(size.width - stroke, size.height - stroke)
-            drawArc(track, 135f, 270f, false, offset, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
-            if (value > 0) drawArc(primary, 135f, value * 270f, false, offset, arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
-        }
-        Column(Modifier.fillMaxWidth().padding(horizontal = 28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (progress == null) {
-                Icon(Icons.Default.Build, contentDescription = null,
-                    modifier = Modifier.size(48.dp), tint = primary)
-            } else {
-                Text("${(value * 100).toInt()}%", style = MaterialTheme.typography.headlineLarge)
+    val locale = LocalConfiguration.current.locales[0]
+    val percentFormat = remember(locale) { NumberFormat.getPercentInstance(locale) }
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (progress == null) {
+            Surface(modifier = Modifier.size(104.dp), shape = MaterialShapes.Cookie9Sided.toShape(),
+                color = primary, contentColor = MaterialTheme.colorScheme.onPrimary) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(44.dp))
+                }
             }
-            Text(label, style = MaterialTheme.typography.labelLarge,
-                textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                val fontScale = LocalDensity.current.fontScale
+                val gaugeSize = minOf(maxWidth, (184 * fontScale.coerceIn(1f, 1.5f)).dp)
+                val stroke = with(LocalDensity.current) { Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round) }
+                Box(Modifier.size(gaugeSize).semantics(mergeDescendants = true) {
+                    progressBarRangeInfo = ProgressBarRangeInfo(target, 0f..1f)
+                    contentDescription = label
+                }, contentAlignment = Alignment.Center) {
+                    CircularWavyProgressIndicator(
+                        progress = { value },
+                        modifier = Modifier.fillMaxSize().padding(8.dp).clearAndSetSemantics {},
+                        color = primary,
+                        trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.12f),
+                        stroke = stroke,
+                        trackStroke = stroke,
+                        waveSpeed = 0.dp,
+                    )
+                    Text(percentFormat.format(value.toDouble()),
+                        style = if (fontScale > 1.3f) MaterialTheme.typography.headlineLargeEmphasized
+                            else MaterialTheme.typography.displayMediumEmphasized,
+                        maxLines = 1,
+                        modifier = Modifier.clearAndSetSemantics {})
+                }
+            }
         }
+        Text(label, style = MaterialTheme.typography.titleMediumEmphasized,
+            textAlign = TextAlign.Center)
     }
 }

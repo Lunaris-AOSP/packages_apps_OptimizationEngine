@@ -18,6 +18,7 @@ android_app {
     required: ["privapp_whitelist_com.lunaris.optimizer"],
 
     static_libs: [
+        "ax_compose",
         "androidx.core_core-ktx",
         "androidx.activity_activity-compose",
         "androidx.compose.runtime_runtime",

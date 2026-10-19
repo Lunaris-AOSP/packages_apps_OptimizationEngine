@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package com.lunaris.optimizer.ui
 
 import androidx.compose.animation.animateColorAsState
@@ -24,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.lunaris.optimizer.R
@@ -49,8 +52,8 @@ fun ExpressiveFloatingBottomBar(selectedTab: Int, onTabSelected: (Int) -> Unit) 
 private fun ExpressiveFloatingBottomBar(selectedTab: Int, segments: ElasticSegments, onTabSelected: (Int) -> Unit) {
     Surface(
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shadowElevation = 8.dp,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shadowElevation = 6.dp,
         modifier = Modifier.widthIn(max = 360.dp).fillMaxWidth(),
     ) {
         Row(
@@ -86,23 +89,34 @@ private fun FloatingNavItem(
 ) {
     val containerColor by animateColorAsState(
         if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
         label = "navigationContainer",
     )
     val contentColor by animateColorAsState(
         if (selected) MaterialTheme.colorScheme.onSecondaryContainer
         else MaterialTheme.colorScheme.onSurfaceVariant,
+        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
         label = "navigationContent",
     )
     Surface(modifier = modifier, shape = CircleShape, color = containerColor, contentColor = contentColor) {
-        Row(
-            modifier = Modifier.clip(CircleShape)
+        val itemModifier = Modifier.clip(CircleShape)
                 .selectable(selected = selected, role = Role.Tab, onClick = hapticClick(onClick))
-                .fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            icon()
-            Text(label, style = MaterialTheme.typography.labelLarge)
+                .fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 12.dp, vertical = 8.dp)
+        val labelStyle = if (selected) MaterialTheme.typography.labelLargeEmphasized
+            else MaterialTheme.typography.labelLarge
+        if (LocalDensity.current.fontScale > 1.3f) {
+            Column(itemModifier, horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                icon()
+                Text(label, style = labelStyle, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            }
+        } else {
+            Row(itemModifier,
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically) {
+                icon()
+                Text(label, style = labelStyle)
+            }
         }
     }
 }
