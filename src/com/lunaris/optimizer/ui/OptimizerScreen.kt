@@ -350,7 +350,7 @@ private fun MainScreen(state: OptimizerUiState, viewModel: OptimizerViewModel, o
 @Composable
 private fun StatusPanel(state: OptimizerUiState, action: @Composable () -> Unit) {
     Surface(shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = MaterialTheme.colorScheme.surfaceBright,
         contentColor = MaterialTheme.colorScheme.onSurface) {
         Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -379,7 +379,7 @@ private fun ProfileOption(profile: Profile, current: Profile, enabled: Boolean,
     modifier: Modifier, stacked: Boolean = false, onClick: () -> Unit) {
     val selected = profile == current
     val container by animateColorAsState(if (selected) MaterialTheme.colorScheme.primaryContainer
-        else MaterialTheme.colorScheme.surfaceContainerLow,
+        else MaterialTheme.colorScheme.surfaceBright,
         animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(), label = "profileColor")
     Surface(modifier = modifier, shape = if (selected) RoundedCornerShape(32.dp)
         else if (stacked) groupedCardShape(profile == Profile.QUICK, profile == Profile.DEEP)
@@ -567,7 +567,7 @@ private fun SelectableToolRow(row: ToolRow, selected: Boolean, enabled: Boolean,
     val context = LocalContext.current
     Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer
-            else MaterialTheme.colorScheme.surfaceContainerLow)) { Row(
+            else MaterialTheme.colorScheme.surfaceBright)) { Row(
         Modifier.fillMaxWidth().toggleable(
             value = selected,
             enabled = enabled,
@@ -671,7 +671,7 @@ private fun ActionCard(action: Action, plan: Plan, enabled: Boolean, toggle: (Bo
 
 @Composable
 private fun maintenanceCardColors() = CardDefaults.cardColors(
-    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    containerColor = MaterialTheme.colorScheme.surfaceBright,
     contentColor = MaterialTheme.colorScheme.onSurface,
 )
 
@@ -759,7 +759,7 @@ private fun MetricsSummary(state: OptimizerUiState) {
 }
 
 @Composable private fun Metric(label: String, value: String, icon: Int, modifier: Modifier) {
-    Surface(modifier, shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+    Surface(modifier, shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceBright) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Icon(painterResource(icon), null, tint = MaterialTheme.colorScheme.primary)
             Text(value, style = MaterialTheme.typography.headlineSmallEmphasized)

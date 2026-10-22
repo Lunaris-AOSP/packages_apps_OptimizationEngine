@@ -70,7 +70,7 @@ internal fun AppCacheSummary(tool: ToolState, selectedPackages: Set<String>) {
 
     Surface(modifier = Modifier.fillMaxWidth().animateContentSize(
         animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec()), shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        color = MaterialTheme.colorScheme.surfaceBright,
         contentColor = MaterialTheme.colorScheme.onSurface) {
         Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.total_app_cache), style = MaterialTheme.typography.titleMediumEmphasized)
@@ -159,7 +159,7 @@ internal fun AppCacheRow(row: ToolRow, selected: Boolean, enabled: Boolean,
     val context = LocalContext.current
     val backgroundColor by animateColorAsState(
         targetValue = if (selected) MaterialTheme.colorScheme.secondaryContainer
-            else MaterialTheme.colorScheme.surfaceContainerLow,
+            else MaterialTheme.colorScheme.surfaceBright,
         animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(), label = "appCacheSelection",
     )
     val cacheSize = stringResource(R.string.app_cache_size,
