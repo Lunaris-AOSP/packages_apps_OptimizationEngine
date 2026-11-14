@@ -21,6 +21,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.selection.triStateToggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,6 +42,7 @@ import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -150,6 +152,31 @@ private fun StorageLegend(color: Color, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Box(Modifier.size(10.dp).background(color, RoundedCornerShape(50)))
         Text(label, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+internal fun AppCacheSelectionRow(rows: List<ToolRow>, selectedPackages: Set<String>,
+    enabled: Boolean, change: (Boolean) -> Unit) {
+    val packages = remember(rows) { rows.filter { it.selectable }.map { it.id }.toSet() }
+    val selectionState = when {
+        packages.isNotEmpty() && selectedPackages.containsAll(packages) -> ToggleableState.On
+        packages.any { it in selectedPackages } -> ToggleableState.Indeterminate
+        else -> ToggleableState.Off
+    }
+    Surface(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceBright) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).triStateToggleable(
+            state = selectionState, enabled = enabled, role = Role.Checkbox,
+            onClick = hapticClick { change(selectionState != ToggleableState.On) },
+        ).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(stringResource(if (selectionState == ToggleableState.On) R.string.deselect_all
+                else R.string.select_all), modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMediumEmphasized,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.38f))
+            TriStateCheckbox(state = selectionState, onClick = null, enabled = enabled)
+        }
     }
 }
 

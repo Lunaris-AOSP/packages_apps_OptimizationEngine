@@ -77,6 +77,8 @@
     <string name="compiled">Compiled</string>
     <string name="choose_apps">Choose apps</string>
     <string name="scan_apps">Scan apps</string>
+    <string name="select_all">Select all</string>
+    <string name="deselect_all">Deselect all</string>
     <string name="cache_selected_count">%1$d apps selected</string>
     <string name="select_cache_apps_first">Choose at least one app before running App Cache Cleaner.</string>
     <string name="app_cache_screen_detail">Cache sizes are measured for installed owner-user apps. Select only the app caches you want included in Main Maintenance.</string>

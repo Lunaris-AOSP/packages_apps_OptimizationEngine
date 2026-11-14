@@ -209,6 +209,18 @@ class OptimizerViewModel(application: Application) : AndroidViewModel(applicatio
             cachePackages = if (selected) it.cachePackages + packageName else it.cachePackages - packageName,
         )
     }
+    fun selectAllAppCaches(selected: Boolean) {
+        val tool = state.value.tools.getValue(Tool.APP_CACHE)
+        if (tool.active) return
+        val packages = tool.rows.filter { it.selectable }.map { it.id }.toSet()
+        if (packages.isEmpty()) return
+        edit {
+            it.copy(
+                profile = Profile.CUSTOM,
+                cachePackages = if (selected) it.cachePackages + packages else it.cachePackages - packages,
+            )
+        }
+    }
     fun selectRareApp(packageName: String, selected: Boolean) {
         state.update { it.copy(selectedRareApps = if (selected)
             it.selectedRareApps + packageName else it.selectedRareApps - packageName) }

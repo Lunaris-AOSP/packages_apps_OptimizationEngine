@@ -454,6 +454,12 @@ private fun AppCacheScreen(state: OptimizerUiState, viewModel: OptimizerViewMode
         item { Text(stringResource(R.string.app_cache_screen_detail),
             modifier = Modifier.padding(bottom = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
         if (tool.detail.isNotBlank()) item { Text(tool.detail, modifier = Modifier.padding(bottom = 16.dp)) }
+        if (tool.rows.any { it.selectable }) item(key = "selection:app_cache") {
+            AppCacheSelectionRow(tool.rows, state.plan.cachePackages, state.editable && !tool.active) {
+                viewModel.selectAllAppCaches(it)
+            }
+            Spacer(Modifier.height(12.dp))
+        }
         itemsIndexed(tool.rows, key = { _, row -> row.id }) { index, row ->
             AppCacheRow(row, row.id in state.plan.cachePackages,
                 state.editable && !tool.active && row.selectable,
