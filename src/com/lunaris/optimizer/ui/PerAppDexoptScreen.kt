@@ -10,6 +10,7 @@
 
 package com.lunaris.optimizer.ui
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.selection.toggleable
@@ -52,17 +53,45 @@ internal fun PerAppDexoptScreen(state: OptimizerUiState, viewModel: OptimizerVie
         }
     }
     val editable = state.editable && state.connected
+    val motion = MaterialTheme.motionScheme
+    val actionContainerColor by animateColorAsState(
+        targetValue = if (dexopt.compiling) MaterialTheme.colorScheme.errorContainer
+            else MaterialTheme.colorScheme.primary,
+        animationSpec = motion.fastEffectsSpec(),
+        label = "dexoptActionContainer",
+    )
+    val actionContentColor by animateColorAsState(
+        targetValue = if (dexopt.compiling) MaterialTheme.colorScheme.onErrorContainer
+            else MaterialTheme.colorScheme.onPrimary,
+        animationSpec = motion.fastEffectsSpec(),
+        label = "dexoptActionContent",
+    )
+    val onCancelClick = hapticReject(viewModel::cancelPerAppDexopt)
+    val onStartClick = hapticConfirm(viewModel::startPerAppDexopt)
     ToolScaffold(stringResource(R.string.per_app_dexopt), onBack, actions = {
-        if (dexopt.compiling) {
-            PrimaryActionButton(stringResource(if (dexopt.status == "cancelling") R.string.cancelling
-                else R.string.stop_compilation), viewModel::cancelPerAppDexopt,
-                enabled = !state.busy && dexopt.status != "cancelling") { Icon(Icons.Default.Close, null) }
-        } else {
-            PrimaryActionButton(stringResource(R.string.compile_selected, state.selectedDexoptApps.size),
-                viewModel::startPerAppDexopt, enabled = editable && dexopt.loaded
-                    && state.selectedDexoptApps.isNotEmpty() && state.dexoptFilter in dexopt.filters) {
-                Icon(Icons.Default.Build, null)
-            }
+        PrimaryActionButton(
+            state = dexopt.compiling,
+            label = if (dexopt.compiling) {
+                stringResource(if (dexopt.status == "cancelling") R.string.cancelling else R.string.stop_compilation)
+            } else {
+                stringResource(R.string.compile_selected, state.selectedDexoptApps.size)
+            },
+            onClick = if (dexopt.compiling) onCancelClick else onStartClick,
+            enabled = if (dexopt.compiling) {
+                !state.busy && dexopt.status != "cancelling"
+            } else {
+                editable && dexopt.loaded && state.selectedDexoptApps.isNotEmpty() && state.dexoptFilter in dexopt.filters
+            },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = actionContainerColor,
+                contentColor = actionContentColor,
+            ),
+        ) { compiling ->
+            Icon(
+                if (compiling) Icons.Default.Close else Icons.Default.Build,
+                null,
+                Modifier.fillMaxSize(),
+            )
         }
     }, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         item(key = "dexopt:description") {

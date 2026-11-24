@@ -22,7 +22,36 @@ internal fun hapticClick(onClick: () -> Unit): () -> Unit {
 internal fun hapticToggle(onValueChange: (Boolean) -> Unit): (Boolean) -> Unit {
     val view = LocalView.current
     return { value ->
-        view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+        view.performHapticFeedback(
+            if (value) HapticFeedbackConstants.TOGGLE_ON else HapticFeedbackConstants.TOGGLE_OFF
+        )
         onValueChange(value)
+    }
+}
+
+@Composable
+internal fun hapticConfirm(onClick: () -> Unit): () -> Unit {
+    val view = LocalView.current
+    return {
+        view.performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+        onClick()
+    }
+}
+
+@Composable
+internal fun hapticReject(onClick: () -> Unit): () -> Unit {
+    val view = LocalView.current
+    return {
+        view.performHapticFeedback(HapticFeedbackConstants.REJECT)
+        onClick()
+    }
+}
+
+@Composable
+internal fun hapticSegment(onClick: () -> Unit): () -> Unit {
+    val view = LocalView.current
+    return {
+        view.performHapticFeedback(HapticFeedbackConstants.SEGMENT_TICK)
+        onClick()
     }
 }

@@ -13,9 +13,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -37,15 +35,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import com.lunaris.optimizer.R
 import com.lunaris.optimizer.model.ToolRow
@@ -70,25 +68,35 @@ internal fun AppCacheSummary(tool: ToolState, selectedPackages: Set<String>) {
     val appStorageColor = MaterialTheme.colorScheme.primary
     val cacheColor = MaterialTheme.colorScheme.tertiary
 
-    Surface(modifier = Modifier.fillMaxWidth().animateContentSize(
-        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec()), shape = MaterialTheme.shapes.extraLarge,
+    Surface(
+        modifier = Modifier.fillMaxWidth().animateContentSize(
+            animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec()
+        ),
+        shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.surfaceBright,
-        contentColor = MaterialTheme.colorScheme.onSurface) {
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
         Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.total_app_cache), style = MaterialTheme.typography.titleMediumEmphasized)
-            Text(if (hasMeasurement && !tool.active) totalSize else "—",
-                style = MaterialTheme.typography.displaySmallEmphasized)
+            Text(
+                if (hasMeasurement && !tool.active) totalSize else "—",
+                style = MaterialTheme.typography.displaySmallEmphasized.copy(fontFeatureSettings = "tnum"),
+            )
             when {
                 tool.active -> {
                     Text(stringResource(R.string.scanning_app_cache), style = MaterialTheme.typography.bodyMedium)
-                    LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth(),
-                        trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    LinearWavyProgressIndicator(
+                        modifier = Modifier.fillMaxWidth(),
+                        trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                    )
                 }
                 hasMeasurement -> {
                     if (storageBytes != null) {
                         val storageSize = Formatter.formatShortFileSize(context, storageBytes)
-                        CacheStorageBar(storageBytes, totalBytes, appStorageColor, cacheColor,
-                            stringResource(R.string.cache_storage_description, storageSize, totalSize))
+                        CacheStorageBar(
+                            storageBytes, totalBytes, appStorageColor, cacheColor,
+                            stringResource(R.string.cache_storage_description, storageSize, totalSize),
+                        )
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             StorageLegend(appStorageColor, stringResource(R.string.app_storage_size, storageSize))
                             StorageLegend(cacheColor, stringResource(R.string.app_cache_size, totalSize))
@@ -96,12 +104,16 @@ internal fun AppCacheSummary(tool: ToolState, selectedPackages: Set<String>) {
                     } else {
                         Text(stringResource(R.string.app_storage_unavailable), style = MaterialTheme.typography.bodyMedium)
                     }
-                    Surface(shape = MaterialTheme.shapes.medium,
+                    Surface(
+                        shape = MaterialTheme.shapes.medium,
                         color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                        contentColor = MaterialTheme.colorScheme.onSurface) {
-                        Text(stringResource(R.string.cache_selected_size, selectedSize),
-                            style = MaterialTheme.typography.labelLargeEmphasized,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                    ) {
+                        Text(
+                            stringResource(R.string.cache_selected_size, selectedSize),
+                            style = MaterialTheme.typography.labelLargeEmphasized.copy(fontFeatureSettings = "tnum"),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        )
                     }
                 }
                 else -> Text(stringResource(R.string.cache_scan_required), style = MaterialTheme.typography.bodyMedium)
@@ -111,17 +123,26 @@ internal fun AppCacheSummary(tool: ToolState, selectedPackages: Set<String>) {
 }
 
 @Composable
-private fun CacheStorageBar(storageBytes: Long, cacheBytes: Long, storageColor: Color,
-    cacheColor: Color, description: String) {
+private fun CacheStorageBar(
+    storageBytes: Long,
+    cacheBytes: Long,
+    storageColor: Color,
+    cacheColor: Color,
+    description: String,
+) {
     val storage = storageBytes.coerceAtLeast(0L).toDouble()
     val cache = cacheBytes.coerceAtLeast(0L).toDouble()
     val total = storage + cache
     val targetCacheFraction = if (total > 0.0) (cache / total).toFloat() else 0f
-    val cacheFraction by animateFloatAsState(targetCacheFraction,
-        animationSpec = tween(600, easing = FastOutSlowInEasing), label = "cacheStorageShare")
+    val slowSpatial = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
+    val cacheFraction by animateFloatAsState(
+        targetCacheFraction,
+        animationSpec = slowSpatial,
+        label = "cacheStorageShare",
+    )
     val reveal = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
-        reveal.animateTo(1f, tween(700, easing = FastOutSlowInEasing))
+        reveal.animateTo(1f, slowSpatial)
     }
     val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
     Canvas(Modifier.fillMaxWidth().height(12.dp).semantics {
@@ -131,7 +152,7 @@ private fun CacheStorageBar(storageBytes: Long, cacheBytes: Long, storageColor: 
         drawRoundRect(trackColor, cornerRadius = CornerRadius(size.height / 2))
         if (total <= 0.0) return@Canvas
         val fraction = cacheFraction.coerceIn(0f, 1f)
-        val width = size.width * reveal.value
+        val width = size.width * reveal.value.coerceIn(0f, 1f)
         val gap = minOf(4.dp.toPx(), width * fraction, width * (1f - fraction))
         val contentWidth = (width - gap).coerceAtLeast(0f)
         val appWidth = contentWidth * (1f - fraction)
@@ -139,8 +160,12 @@ private fun CacheStorageBar(storageBytes: Long, cacheBytes: Long, storageColor: 
         fun segment(start: Float, segmentWidth: Float, color: Color) {
             if (segmentWidth <= 0f) return
             val x = if (layoutDirection == LayoutDirection.Rtl) size.width - start - segmentWidth else start
-            drawRoundRect(color = color, topLeft = Offset(x, 0f), size = Size(segmentWidth, size.height),
-                cornerRadius = CornerRadius(minOf(size.height, segmentWidth) / 2))
+            drawRoundRect(
+                color = color,
+                topLeft = Offset(x, 0f),
+                size = Size(segmentWidth, size.height),
+                cornerRadius = CornerRadius(minOf(size.height, segmentWidth) / 2),
+            )
         }
         segment(0f, appWidth, storageColor)
         segment(appWidth + gap, cacheWidth, cacheColor)
@@ -156,62 +181,109 @@ private fun StorageLegend(color: Color, label: String) {
 }
 
 @Composable
-internal fun AppCacheSelectionRow(rows: List<ToolRow>, selectedPackages: Set<String>,
-    enabled: Boolean, change: (Boolean) -> Unit) {
+internal fun AppCacheSelectionRow(
+    rows: List<ToolRow>,
+    selectedPackages: Set<String>,
+    enabled: Boolean,
+    change: (Boolean) -> Unit,
+) {
     val packages = remember(rows) { rows.filter { it.selectable }.map { it.id }.toSet() }
     val selectionState = when {
         packages.isNotEmpty() && selectedPackages.containsAll(packages) -> ToggleableState.On
         packages.any { it in selectedPackages } -> ToggleableState.Indeterminate
         else -> ToggleableState.Off
     }
-    Surface(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceBright) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).triStateToggleable(
-            state = selectionState, enabled = enabled, role = Role.Checkbox,
-            onClick = hapticClick { change(selectionState != ToggleableState.On) },
-        ).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(stringResource(if (selectionState == ToggleableState.On) R.string.deselect_all
-                else R.string.select_all), modifier = Modifier.weight(1f),
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceBright,
+    ) {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 48.dp).triStateToggleable(
+                state = selectionState,
+                enabled = enabled,
+                role = Role.Checkbox,
+                onClick = hapticClick { change(selectionState != ToggleableState.On) },
+            ).padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                stringResource(if (selectionState == ToggleableState.On) R.string.deselect_all else R.string.select_all),
+                modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.titleMediumEmphasized,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.38f))
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.38f),
+            )
             TriStateCheckbox(state = selectionState, onClick = null, enabled = enabled)
         }
     }
 }
 
 @Composable
-internal fun AppCacheRow(row: ToolRow, selected: Boolean, enabled: Boolean,
-    first: Boolean, last: Boolean, change: (Boolean) -> Unit) {
+internal fun AppCacheRow(
+    row: ToolRow,
+    selected: Boolean,
+    enabled: Boolean,
+    first: Boolean,
+    last: Boolean,
+    change: (Boolean) -> Unit,
+) {
     val context = LocalContext.current
     val backgroundColor by animateColorAsState(
         targetValue = if (selected) MaterialTheme.colorScheme.secondaryContainer
             else MaterialTheme.colorScheme.surfaceBright,
-        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(), label = "appCacheSelection",
+        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
+        label = "appCacheSelection",
     )
-    val cacheSize = stringResource(R.string.app_cache_size,
-        Formatter.formatShortFileSize(context, row.bytes.coerceAtLeast(0L)))
-    val shape = groupedCardShape(first, last)
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
+            else MaterialTheme.colorScheme.onSurface,
+        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
+        label = "appCacheContent",
+    )
+    val cacheSize = stringResource(
+        R.string.app_cache_size,
+        Formatter.formatShortFileSize(context, row.bytes.coerceAtLeast(0L)),
+    )
+    val shape = animatedGroupedCardShape(first, last, selected)
     Column {
-        Surface(modifier = Modifier.fillMaxWidth(), shape = shape,
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = shape,
             color = backgroundColor,
-            contentColor = if (selected) MaterialTheme.colorScheme.onSecondaryContainer
-                else MaterialTheme.colorScheme.onSurface) {
-            Row(Modifier.fillMaxWidth().toggleable(
-                value = selected, enabled = enabled, role = Role.Checkbox,
-                onValueChange = hapticToggle(change),
-            ).padding(16.dp), verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            contentColor = contentColor,
+        ) {
+            Row(
+                Modifier.fillMaxWidth().toggleable(
+                    value = selected,
+                    enabled = enabled,
+                    role = Role.Checkbox,
+                    onValueChange = hapticToggle(change),
+                ).padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 AppCacheIcon(row.id)
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(row.title, style = if (selected) MaterialTheme.typography.titleMediumEmphasized
-                        else MaterialTheme.typography.titleMedium,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(row.detail, style = MaterialTheme.typography.bodySmall,
+                    Text(
+                        row.title,
+                        style = if (selected) MaterialTheme.typography.titleMediumEmphasized
+                            else MaterialTheme.typography.titleMedium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        row.detail,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(cacheSize,
-                        style = MaterialTheme.typography.labelLargeEmphasized, color = MaterialTheme.colorScheme.primary)
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        cacheSize,
+                        style = MaterialTheme.typography.labelLargeEmphasized.copy(fontFeatureSettings = "tnum"),
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                 }
                 Checkbox(checked = selected, onCheckedChange = null, enabled = enabled)
             }
@@ -237,13 +309,21 @@ internal fun AppCacheIcon(packageName: String) {
             }
         }
     }
-    Crossfade(targetState = icon, modifier = Modifier.size(40.dp),
-        animationSpec = tween(150), label = "appCacheIcon") { bitmap ->
+    Crossfade(
+        targetState = icon,
+        modifier = Modifier.size(40.dp),
+        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
+        label = "appCacheIcon",
+    ) { bitmap ->
         if (bitmap != null) {
             Image(bitmap = bitmap, contentDescription = null, modifier = Modifier.fillMaxSize())
         } else {
-            Icon(painterResource(R.drawable.ic_grid_view), contentDescription = null,
-                modifier = Modifier.fillMaxSize(), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(
+                painterResource(R.drawable.ic_grid_view),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

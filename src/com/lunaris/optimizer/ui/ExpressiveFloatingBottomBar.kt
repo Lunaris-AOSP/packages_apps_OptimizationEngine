@@ -8,6 +8,8 @@
 package com.lunaris.optimizer.ui
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -24,10 +26,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.lunaris.optimizer.R
 
@@ -52,7 +56,8 @@ fun ExpressiveFloatingBottomBar(selectedTab: Int, onTabSelected: (Int) -> Unit) 
 private fun ExpressiveFloatingBottomBar(selectedTab: Int, segments: ElasticSegments, onTabSelected: (Int) -> Unit) {
     Surface(
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
         shadowElevation = 6.dp,
         modifier = Modifier.widthIn(max = 360.dp).fillMaxWidth(),
     ) {
@@ -87,34 +92,48 @@ private fun FloatingNavItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val motion = MaterialTheme.motionScheme
     val containerColor by animateColorAsState(
         if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
-        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
+        animationSpec = motion.fastEffectsSpec(),
         label = "navigationContainer",
     )
     val contentColor by animateColorAsState(
         if (selected) MaterialTheme.colorScheme.onSecondaryContainer
         else MaterialTheme.colorScheme.onSurfaceVariant,
-        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
+        animationSpec = motion.fastEffectsSpec(),
         label = "navigationContent",
+    )
+    val iconScale by animateFloatAsState(
+        if (selected) 1.08f else 1f,
+        animationSpec = motion.fastSpatialSpec(),
+        label = "navigationIconScale",
     )
     Surface(modifier = modifier, shape = CircleShape, color = containerColor, contentColor = contentColor) {
         val itemModifier = Modifier.clip(CircleShape)
-                .selectable(selected = selected, role = Role.Tab, onClick = hapticClick(onClick))
-                .fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 12.dp, vertical = 8.dp)
+            .selectable(selected = selected, role = Role.Tab, onClick = hapticSegment(onClick))
+            .fillMaxWidth().heightIn(min = 52.dp).padding(horizontal = 12.dp, vertical = 8.dp)
         val labelStyle = if (selected) MaterialTheme.typography.labelLargeEmphasized
             else MaterialTheme.typography.labelLarge
+        val scaledIcon: @Composable () -> Unit = {
+            Box(Modifier.graphicsLayer { scaleX = iconScale; scaleY = iconScale }) { icon() }
+        }
         if (LocalDensity.current.fontScale > 1.3f) {
-            Column(itemModifier, horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                icon()
-                Text(label, style = labelStyle, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+            Column(
+                itemModifier,
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                scaledIcon()
+                Text(label, style = labelStyle, textAlign = TextAlign.Center)
             }
         } else {
-            Row(itemModifier,
+            Row(
+                itemModifier,
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                verticalAlignment = Alignment.CenterVertically) {
-                icon()
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                scaledIcon()
                 Text(label, style = labelStyle)
             }
         }
