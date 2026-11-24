@@ -76,7 +76,7 @@ import com.lunaris.optimizer.R
 import com.lunaris.optimizer.model.*
 import com.android.axion.compose.preferences.ExpressiveSwitch
 
-private enum class Screen { MAIN, TOOLS, RESULTS, APP_CACHE, DATA_CACHE, RARE_APPS, RESOURCES, DEXOPT }
+private enum class Screen { MAIN, TOOLS, RESULTS, APP_CACHE, DATA_CACHE, RARE_APPS, RESOURCES, DEXOPT, PER_APP_DEXOPT }
 
 private val Screen.isTopLevel: Boolean get() = this == Screen.MAIN || this == Screen.TOOLS
 
@@ -105,7 +105,11 @@ fun OptimizerScreen(viewModel: OptimizerViewModel, onBack: () -> Unit) {
     val screen = backStack.last()
     LifecycleStartEffect(screen, viewModel) {
         viewModel.setResourceScreenActive(screen == Screen.RESOURCES)
-        onStopOrDispose { viewModel.setResourceScreenActive(false) }
+        viewModel.setDexoptScreenActive(screen == Screen.PER_APP_DEXOPT)
+        onStopOrDispose {
+            viewModel.setResourceScreenActive(false)
+            viewModel.setDexoptScreenActive(false)
+        }
     }
     val navigateBack: () -> Unit = {
         if (backStack.size > 1) backStack = backStack.dropLast(1) else onBack()
@@ -168,6 +172,7 @@ fun OptimizerScreen(viewModel: OptimizerViewModel, onBack: () -> Unit) {
                     Screen.RARE_APPS -> RareAppsScreen(state, viewModel, pageBack)
                     Screen.RESOURCES -> ResourceScreen(state, viewModel, pageBack)
                     Screen.DEXOPT -> DexoptAppsScreen(state.run, pageBack)
+                    Screen.PER_APP_DEXOPT -> PerAppDexoptScreen(state, viewModel, pageBack)
                     else -> Unit
                 }
             }
@@ -427,7 +432,9 @@ private fun ToolsScreen(onBack: () -> Unit, bottomPadding: Dp, navigate: (Screen
                 ToolNavigationCard(Icons.Default.Close, stringResource(R.string.rare_apps_title),
                     stringResource(R.string.rare_apps_detail), groupedCardShape(false, false)) { navigate(Screen.RARE_APPS) }
                 ToolNavigationCard(Icons.Default.Settings, stringResource(R.string.resources_title),
-                    stringResource(R.string.resources_detail), groupedCardShape(false, true)) { navigate(Screen.RESOURCES) }
+                    stringResource(R.string.resources_detail), groupedCardShape(false, false)) { navigate(Screen.RESOURCES) }
+                ToolNavigationCard(Icons.Default.Build, stringResource(R.string.per_app_dexopt),
+                    stringResource(R.string.per_app_dexopt_detail), groupedCardShape(false, true)) { navigate(Screen.PER_APP_DEXOPT) }
             }
         }
     }
@@ -528,7 +535,7 @@ private fun ResourceScreen(state: OptimizerUiState, viewModel: OptimizerViewMode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ToolScaffold(title: String, onBack: () -> Unit, actions: (@Composable () -> Unit)? = null,
+internal fun ToolScaffold(title: String, onBack: () -> Unit, actions: (@Composable () -> Unit)? = null,
     bottomPadding: Dp? = null,
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(12.dp),
     content: LazyListScope.() -> Unit) {

@@ -221,7 +221,7 @@ internal fun AppCacheRow(row: ToolRow, selected: Boolean, enabled: Boolean,
 }
 
 @Composable
-private fun AppCacheIcon(packageName: String) {
+internal fun AppCacheIcon(packageName: String) {
     val context = LocalContext.current
     val sizePx = with(LocalDensity.current) { 40.dp.roundToPx() }
     val icon by produceState<ImageBitmap?>(null, context, packageName, sizePx) {

@@ -27,12 +27,15 @@ data class OptimizerUiState(
     val confirm: Boolean = false,
     val lastReport: String = "",
     val tools: Map<Tool, ToolState> = Tool.entries.associateWith { ToolState(it) },
+    val perAppDexopt: PerAppDexoptState = PerAppDexoptState(),
+    val selectedDexoptApps: Set<String> = emptySet(),
+    val dexoptFilter: String = "speed-profile",
     val resourceLiveUpdates: Boolean = false,
     val selectedRareApps: Set<String> = emptySet(),
     val restartPrompt: Boolean = false,
     val dismissedResultRunId: Long = 0,
 ) {
-    val editable get() = !run.active && !busy
+    val editable get() = !run.active && !perAppDexopt.active && !busy
     val showRunResult get() = run.id != 0L && !run.active && run.id != dismissedResultRunId
 }
 
@@ -47,6 +50,8 @@ class OptimizerViewModel(application: Application) : AndroidViewModel(applicatio
     private val refreshLock = Mutex()
     private var promptedDataRun = 0L
     private var clearedCacheRun = 0L
+    private var dexoptScreenActive = false
+    private var dexoptRefreshOnEntry = false
     private var resourceScreenActive = false
     private var nextResourceSampleAt = 0L
     // Poll only while the screen has lifecycle-aware subscribers. A snapshot reattaches after process death.
@@ -84,6 +89,25 @@ class OptimizerViewModel(application: Application) : AndroidViewModel(applicatio
                 }) {
                 clearedCacheRun = run.id
                 clearAppCacheSelection()
+            }
+            val dexopt = repository.perAppDexoptSnapshot(state.value.perAppDexopt)
+            state.update { current -> current.copy(
+                perAppDexopt = dexopt,
+                selectedDexoptApps = if (dexopt.compiling && current.selectedDexoptApps.isEmpty())
+                    dexopt.apps.filter { it.requestedFilter.isNotEmpty() }.map { it.packageName }.toSet()
+                else if (dexopt.loaded) current.selectedDexoptApps.intersect(
+                    dexopt.apps.map { it.packageName }.toSet(),
+                ) else current.selectedDexoptApps,
+                dexoptFilter = if (dexopt.compiling) dexopt.apps.firstOrNull { it.requestedFilter.isNotEmpty() }
+                    ?.requestedFilter ?: current.dexoptFilter
+                else if (current.dexoptFilter in dexopt.filters || dexopt.filters.isEmpty())
+                    current.dexoptFilter else dexopt.filters.first(),
+            ) }
+            if (dexoptScreenActive && dexoptRefreshOnEntry && !dexopt.active && !run.active && !state.value.busy) {
+                dexoptRefreshOnEntry = false
+                repository.refreshDexoptApps()
+                val scanning = repository.perAppDexoptSnapshot(dexopt)
+                state.update { it.copy(perAppDexopt = scanning) }
             }
             if (includeMetrics) {
                 try {
@@ -138,6 +162,42 @@ class OptimizerViewModel(application: Application) : AndroidViewModel(applicatio
         } catch (e: CancellationException) { throw e }
         catch (e: Exception) { state.update { it.copy(connected = false, error = e.message ?: e.javaClass.simpleName) } }
     }
+    fun setDexoptScreenActive(active: Boolean) {
+        dexoptScreenActive = active
+        dexoptRefreshOnEntry = active
+        if (active) refreshMetrics()
+    }
+    fun selectDexoptApps(packages: Set<String>, selected: Boolean) {
+        if (!state.value.editable) return
+        state.update { it.copy(selectedDexoptApps = if (selected)
+            it.selectedDexoptApps + packages else it.selectedDexoptApps - packages) }
+    }
+    fun setDexoptFilter(filter: String) {
+        if (!state.value.editable || filter !in state.value.perAppDexopt.filters) return
+        state.update { it.copy(dexoptFilter = filter) }
+    }
+    fun refreshDexoptApps() = dexoptRequest {
+        repository.refreshDexoptApps()
+    }
+    fun startPerAppDexopt() {
+        val current = state.value
+        if (!current.editable || current.selectedDexoptApps.isEmpty()) return
+        dexoptRequest { repository.startPerAppDexopt(current.selectedDexoptApps, current.dexoptFilter) }
+    }
+    fun cancelPerAppDexopt() = dexoptRequest(allowActive = true) {
+        repository.cancelPerAppDexopt()
+    }
+    private fun dexoptRequest(allowActive: Boolean = false, request: suspend () -> Unit) {
+        val current = state.value
+        if (!current.connected || current.busy || (!allowActive && !current.editable)) return
+        state.update { it.copy(busy = true, error = null) }
+        viewModelScope.launch {
+            try { request(); refresh(false) }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { state.update { it.copy(error = e.message ?: "Per-app dexopt unavailable") } }
+            finally { state.update { it.copy(busy = false) } }
+        }
+    }
     fun setResourceScreenActive(active: Boolean) {
         resourceScreenActive = active
         if (active) nextResourceSampleAt = 0L
@@ -150,7 +210,7 @@ class OptimizerViewModel(application: Application) : AndroidViewModel(applicatio
     private suspend fun refreshLiveResources() {
         val current = state.value
         if (!resourceScreenActive || !current.resourceLiveUpdates || !current.connected || current.busy
-            || current.run.active || current.tools.values.any { it.active }
+            || current.run.active || current.perAppDexopt.active || current.tools.values.any { it.active }
             || SystemClock.elapsedRealtime() < nextResourceSampleAt) return
         try {
             val id = repository.startTool(Tool.RESOURCES)

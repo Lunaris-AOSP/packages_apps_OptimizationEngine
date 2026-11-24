@@ -25,6 +25,31 @@ class OptimizationRepository(private val context: Context) {
     suspend fun toolSnapshot(tool: Tool, previous: ToolState? = null): ToolState = withContext(Dispatchers.IO) {
         readToolSnapshot(tool, previous) { offset -> manager().getToolSnapshot(tool.key, offset) }
     }
+    suspend fun refreshDexoptApps() = withContext(Dispatchers.IO) { manager().refreshDexoptApps() }
+    suspend fun startPerAppDexopt(packages: Set<String>, filter: String) = withContext(Dispatchers.IO) {
+        manager().startPerAppDexopt(packages.sorted().toTypedArray(), filter)
+    }
+    suspend fun cancelPerAppDexopt() = withContext(Dispatchers.IO) { manager().cancelPerAppDexopt() }
+    suspend fun perAppDexoptSnapshot(previous: PerAppDexoptState): PerAppDexoptState = withContext(Dispatchers.IO) {
+        repeat(3) {
+            val metadata = manager().getPerAppDexoptSnapshot(Int.MAX_VALUE)
+            val header = PerAppDexoptState.fromBundle(metadata)
+            if (previous.revision == header.revision) return@withContext header.copy(apps = previous.apps)
+            val total = metadata.getInt("total")
+            val apps = mutableListOf<DexoptApp>()
+            while (apps.size < total) {
+                val page = manager().getPerAppDexoptSnapshot(apps.size)
+                if (page.getLong("revision") != header.revision) break
+                val parsed = PerAppDexoptState.fromBundle(page).apps
+                if (parsed.isEmpty() || apps.size + parsed.size > total) break
+                apps += parsed
+            }
+            if (apps.size == total) return@withContext header.copy(apps = apps.sortedWith(
+                compareBy<DexoptApp> { it.title.lowercase(java.util.Locale.ROOT) }.thenBy { it.packageName },
+            ))
+        }
+        previous
+    }
     suspend fun restartDevice() = withContext(Dispatchers.IO) { manager().restartDevice() }
 }
 
