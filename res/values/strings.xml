@@ -24,7 +24,7 @@
     <string name="quick">Quick Optimize</string>
     <string name="deep">Deep Optimize</string>
     <string name="quick_detail">Advanced usage-based dexopt and Android storage maintenance. Duration depends on your apps and device.</string>
-    <string name="deep_detail" formatted="false">Full app compilation, storage maintenance, and zRAM compaction. Uses more time, power, and disk space. Requires charging or battery above 25%.</string>
+    <string name="deep_detail" formatted="false">Advanced usage-based dexopt, storage maintenance, and zRAM compaction.</string>
     <string name="actions">Individual optimizations</string>
     <string name="main_maintenance">Main Maintenance</string>
     <string name="other_tools">Other Optimization Tools</string>
@@ -40,12 +40,13 @@
     <string name="cancel_detail">Cancellation stops upcoming work. A cache or storage request already accepted by Android may finish in the background.</string>
     <string name="last_report">Last completed report</string>
     <string name="scope_note">Owner user only. Personal files and app data are preserved. Free memory and compilation coverage are not device health scores.</string>
-    <string name="deep_warning" formatted="false">Full compilation requires charging or battery above 25% and may take a long time. It can use additional storage; compilation stops before the next app if unplugged battery reaches 25% or the device becomes too warm.</string>
+    <string name="deep_warning" formatted="false">Speed compilation requires charging or battery above 25% and may take a long time. It can use additional storage; compilation stops before the next app if unplugged battery reaches 25% or the device becomes too warm.</string>
     <string name="confirm_detail">Only the selected actions will run. You can leave this screen and return to see progress.</string>
     <string name="start">Start maintenance</string>
     <string name="go_back">Go back</string>
     <string name="hide_options">Hide options</string>
     <string name="configure">Configure</string>
+    <string name="full_compile_detail">Choose speed-profile to compile using app profiles or speed to compile all eligible methods.</string>
     <string name="full_compile">Full compilation</string>
     <string name="cache_title">App cache cleanup</string>
     <string name="trim_title">Storage maintenance</string>

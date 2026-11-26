@@ -256,7 +256,10 @@ class OptimizerViewModel(application: Application) : AndroidViewModel(applicatio
     }
     fun profile(profile: Profile) = edit {
         when (profile) {
-            Profile.QUICK, Profile.DEEP -> Plan.forProfile(profile).copy(cachePackages = it.cachePackages)
+            Profile.QUICK, Profile.DEEP -> Plan.forProfile(profile).copy(
+                cachePackages = it.cachePackages,
+                fullCompilationFilter = it.fullCompilationFilter,
+            )
             Profile.CUSTOM -> it.copy(profile = Profile.CUSTOM)
         }
     }

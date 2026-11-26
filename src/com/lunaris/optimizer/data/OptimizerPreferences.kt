@@ -21,6 +21,9 @@ class OptimizerPreferences(context: Context) {
             profile = profile,
             adaptiveCompilation = if (profile == Profile.CUSTOM) store.getBoolean("adaptive", false) else preset.adaptiveCompilation,
             fullCompilation = if (profile == Profile.CUSTOM) store.getBoolean("full", false) else preset.fullCompilation,
+            fullCompilationFilter = FullCompilationFilter.entries.find {
+                it.value == store.getString("full_filter", null)
+            } ?: preset.fullCompilationFilter,
             cachePackages = store.getStringSet("cache_packages", emptySet()) ?: emptySet(),
             continueOnError = store.getBoolean("continue", true),
         )
@@ -32,6 +35,7 @@ class OptimizerPreferences(context: Context) {
     } else 0L
     fun write(plan: Plan, clearedCacheRun: Long) {
         store.edit().putStringSet("actions", plan.selected.map { it.key }.toSet())
+            .putString("full_filter", plan.fullCompilationFilter.value)
             .putBoolean("adaptive", plan.adaptiveCompilation)
             .putString("profile", plan.profile.name).putBoolean("full", plan.fullCompilation)
             .putStringSet("cache_packages", plan.cachePackages)

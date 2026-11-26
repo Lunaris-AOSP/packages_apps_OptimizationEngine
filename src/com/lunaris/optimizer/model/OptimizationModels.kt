@@ -9,10 +9,15 @@ import android.os.Bundle
 
 enum class Action(val key: String) { CACHE("cache"), TRIM("trim"), ZRAM("zram"), DEXOPT("dexopt") }
 enum class Profile { QUICK, DEEP, CUSTOM }
+enum class FullCompilationFilter(val value: String) {
+    SPEED_PROFILE("speed-profile"), SPEED("speed")
+}
+
 data class Plan(
     val selected: Set<Action> = setOf(Action.TRIM, Action.DEXOPT),
     val profile: Profile = Profile.QUICK,
     val fullCompilation: Boolean = false,
+    val fullCompilationFilter: FullCompilationFilter = FullCompilationFilter.SPEED,
     val adaptiveCompilation: Boolean = true,
     val cachePackages: Set<String> = emptySet(),
     val continueOnError: Boolean = true,
@@ -22,8 +27,6 @@ data class Plan(
             Profile.DEEP -> Plan(
                 selected = setOf(Action.TRIM, Action.ZRAM, Action.DEXOPT),
                 profile = Profile.DEEP,
-                fullCompilation = true,
-                adaptiveCompilation = false,
             )
             else -> Plan(profile = profile)
         }
@@ -31,7 +34,7 @@ data class Plan(
 
     fun toBundle() = Bundle().apply {
         Action.entries.forEach { putBoolean(it.key, it in selected) }
-        putString("filter", if (adaptiveCompilation) "adaptive" else if (fullCompilation) "speed" else "speed-profile")
+        putString("filter", if (adaptiveCompilation) "adaptive" else if (fullCompilation) fullCompilationFilter.value else "speed-profile")
         putStringArray("cache_packages", cachePackages.sorted().toTypedArray())
         putBoolean("continue_on_error", continueOnError)
     }

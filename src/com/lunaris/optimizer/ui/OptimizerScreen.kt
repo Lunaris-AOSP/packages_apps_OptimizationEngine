@@ -474,7 +474,8 @@ private fun MainScreen(
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 state.plan.selected.forEach { Text("- " + stringResource(actionTitle(it))) }
                 if (Action.CACHE in state.plan.selected) Text(stringResource(R.string.cache_selected_count, state.plan.cachePackages.size))
-                if (Action.DEXOPT in state.plan.selected && (state.plan.fullCompilation || state.plan.adaptiveCompilation)) {
+                if (Action.DEXOPT in state.plan.selected && (state.plan.adaptiveCompilation ||
+                        (state.plan.fullCompilation && state.plan.fullCompilationFilter == FullCompilationFilter.SPEED))) {
                     Text(stringResource(R.string.deep_warning))
                 }
                 Text(stringResource(R.string.confirm_detail))
@@ -1160,12 +1161,24 @@ private fun ActionCard(
                         }
                         ToggleRow(
                             stringResource(R.string.full_compile),
-                            stringResource(R.string.deep_warning),
+                            stringResource(R.string.full_compile_detail),
                             plan.fullCompilation,
-                            enabled && selected && !plan.adaptiveCompilation,
+                            enabled && selected,
                             icon = { Icon(Icons.Default.Build, null) },
                         ) { value ->
-                            edit { it.copy(fullCompilation = value, profile = Profile.CUSTOM) }
+                            edit { it.copy(fullCompilation = value, adaptiveCompilation = false, profile = Profile.CUSTOM) }
+                        }
+                        if (plan.fullCompilation) {
+                            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FullCompilationFilter.entries.forEach { filter ->
+                                    FilterChip(
+                                        selected = plan.fullCompilationFilter == filter,
+                                        onClick = hapticClick { edit { it.copy(fullCompilationFilter = filter) } },
+                                        enabled = enabled && selected,
+                                        label = { Text(filter.value) },
+                                    )
+                                }
+                            }
                         }
                     }
                 }
